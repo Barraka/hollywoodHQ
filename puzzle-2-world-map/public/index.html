@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission: Hollywood — World Map Locator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #060612;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+      font-family: 'Courier New', monospace;
+      color: rgba(0, 220, 255, 0.5);
+    }
+
+    /* ── Map Container ── */
+    #map-container {
+      position: absolute;
+      inset: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #map-container svg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* ── Country Styling ── */
+    #map-container svg path {
+      fill: rgba(0, 220, 255, 0.04);
+      stroke: rgba(0, 220, 255, 0.5);
+      stroke-width: 0.3;
+      filter: drop-shadow(0 0 2px rgba(0, 220, 255, 0.3));
+    }
+
+    /* ── Grid Overlay ── */
+    #grid {
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(0, 220, 255, 0.04) 59px, rgba(0, 220, 255, 0.04) 60px),
+        repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(0, 220, 255, 0.04) 59px, rgba(0, 220, 255, 0.04) 60px);
+      pointer-events: none;
+    }
+
+    /* ── Scanlines ── */
+    #scanlines {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
+      pointer-events: none;
+    }
+
+    /* ── Vignette ── */
+    #vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(6, 6, 18, 0.6) 80%, rgba(6, 6, 18, 0.95) 100%);
+      pointer-events: none;
+    }
+
+    /* ── Crosshair Lines ── */
+    #crosshair-h, #crosshair-v {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    #crosshair-h {
+      left: 0; right: 0; height: 1px;
+      background: rgba(255, 60, 60, 0.8);
+      box-shadow: 0 0 8px rgba(255, 60, 60, 0.6), 0 0 20px rgba(255, 60, 60, 0.3), 0 0 40px rgba(255, 60, 60, 0.1);
+      top: 50%;
+    }
+
+    #crosshair-v {
+      top: 0; bottom: 0; width: 1px;
+      background: rgba(255, 60, 60, 0.8);
+      box-shadow: 0 0 8px rgba(255, 60, 60, 0.6), 0 0 20px rgba(255, 60, 60, 0.3), 0 0 40px rgba(255, 60, 60, 0.1);
+      left: 50%;
+    }
+
+    /* ── Crosshair Center Dot ── */
+    #crosshair-dot {
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 60, 60, 0.9);
+      box-shadow: 0 0 12px rgba(255, 60, 60, 0.8), 0 0 30px rgba(255, 60, 60, 0.4);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      top: 50%; left: 50%;
+    }
+
+    /* ── Hold Progress Ring ── */
+    #hold-ring {
+      position: absolute;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      display: none;
+      opacity: 0.8;
+      top: 50%; left: 50%;
+    }
+
+    /* ── Coordinate Labels ── */
+    .coord-label {
+      position: absolute;
+      font-size: 10px;
+      letter-spacing: 1px;
+      opacity: 0.4;
+    }
+
+    .coord-top, .coord-bottom { left: 50%; transform: translateX(-50%); }
+    .coord-top { top: 12px; }
+    .coord-bottom { bottom: 12px; }
+    .coord-left, .coord-right { top: 50%; transform: translateY(-50%); }
+    .coord-left { left: 10px; }
+    .coord-right { right: 10px; }
+
+    /* ── Corner Brackets ── */
+    .corner { position: absolute; width: 30px; height: 30px; pointer-events: none; }
+    .corner-tl { top: 30px; left: 30px; border-top: 1px solid rgba(0, 220, 255, 0.3); border-left: 1px solid rgba(0, 220, 255, 0.3); }
+    .corner-tr { top: 30px; right: 30px; border-top: 1px solid rgba(0, 220, 255, 0.3); border-right: 1px solid rgba(0, 220, 255, 0.3); }
+    .corner-bl { bottom: 30px; left: 30px; border-bottom: 1px solid rgba(0, 220, 255, 0.3); border-left: 1px solid rgba(0, 220, 255, 0.3); }
+    .corner-br { bottom: 30px; right: 30px; border-bottom: 1px solid rgba(0, 220, 255, 0.3); border-right: 1px solid rgba(0, 220, 255, 0.3); }
+
+    /* ── Pulsing City Dots (SVG) ── */
+    .city-dot-svg {
+      fill: rgba(0, 220, 255, 0.9);
+      filter: drop-shadow(0 0 4px rgba(0, 220, 255, 0.8));
+      animation: svg-pulse 2s ease-out infinite;
+      animation-delay: var(--d, 0s);
+    }
+
+    @keyframes svg-pulse {
+      0% { r: 2.5; opacity: 1; }
+      50% { r: 5; opacity: 0.6; }
+      100% { r: 2.5; opacity: 1; }
+    }
+
+    /* ── Header Text ── */
+    #header {
+      position: absolute;
+      top: 8px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(0, 220, 255, 0.4);
+    }
+
+    /* ── Status Bar ── */
+    #status {
+      position: absolute;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: rgba(0, 220, 255, 0.5);
+    }
+
+    #status-cursor { animation: blink 1.2s step-end infinite; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ── Scrolling Data Feed ── */
+    #data-feed {
+      position: absolute;
+      top: 60px; right: 12px; width: 180px; bottom: 40px;
+      overflow: hidden;
+      pointer-events: none;
+      mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+    }
+
+    #data-feed-inner { animation: scroll-feed 60s linear infinite; }
+
+    @keyframes scroll-feed {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-50%); }
+    }
+
+    .feed-line {
+      font-family: 'Courier New', monospace;
+      font-size: 9px; line-height: 1.6;
+      color: rgba(0, 220, 255, 0.2);
+      white-space: nowrap;
+    }
+
+    .feed-line.highlight { color: rgba(0, 220, 255, 0.45); }
+
+    /* ── Screen Glitch ── */
+    #glitch-overlay {
+      position: absolute; inset: 0;
+      pointer-events: none; opacity: 0; z-index: 9998;
+    }
+
+    #glitch-overlay.active { animation: glitch-flash 150ms steps(2) forwards; }
+
+    @keyframes glitch-flash {
+      0% {
+        opacity: 1;
+        background: linear-gradient(0deg, transparent 0%, rgba(0,220,255,0.03) 20%, transparent 21%, transparent 40%, rgba(255,0,80,0.02) 41%, transparent 43%, transparent 60%, rgba(0,220,255,0.04) 61%, transparent 63%, transparent 80%, rgba(0,255,100,0.02) 81%, transparent 83%);
+        clip-path: inset(0 0 0 0);
+      }
+      25% { clip-path: inset(10% 0 60% 0); transform: translateX(-3px); }
+      50% { clip-path: inset(40% 0 20% 0); transform: translateX(4px); }
+      75% { clip-path: inset(70% 0 5% 0); transform: translateX(-2px); }
+      100% { opacity: 0; transform: translateX(0); }
+    }
+
+    /* ── Sweep Animation ── */
+    #sweep {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(0, 220, 255, 0.03) 50%, transparent 100%);
+      animation: sweep 4s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
+    /* ── Solved Overlay ── */
+    #solved-overlay {
+      position: absolute; inset: 0;
+      display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0, 20, 0, 0.7);
+      z-index: 9999;
+    }
+
+    #solved-overlay .solved-text {
+      font-size: 48px;
+      letter-spacing: 12px;
+      color: rgba(0, 255, 100, 0.9);
+      text-shadow: 0 0 20px rgba(0, 255, 100, 0.6), 0 0 60px rgba(0, 255, 100, 0.3);
+      animation: solved-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes solved-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ── Position Debug ── */
+    #pos-debug {
+      position: absolute;
+      top: 12px; left: 12px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      color: rgba(0, 220, 255, 0.6);
+      font-family: 'Courier New', monospace;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    /* ── Mock Mode Hint ── */
+    #mock-hint {
+      display: none;
+      position: absolute;
+      bottom: 55px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: rgba(255, 200, 0, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">Global Tracking System v3.7 — Classified</div>
+
+  <!-- Corner brackets -->
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Coordinate labels -->
+  <div class="coord-label coord-top" id="coord-lon">LON 0.000°</div>
+  <div class="coord-label coord-bottom">LATITUDE / LONGITUDE TRACKING ACTIVE</div>
+  <div class="coord-label coord-left" id="coord-lat">LAT 0.000°</div>
+  <div class="coord-label coord-right">SIG: NOMINAL</div>
+
+  <!-- Map -->
+  <div id="map-container"></div>
+
+  <!-- Overlays -->
+  <div id="grid"></div>
+  <div id="scanlines"></div>
+  <div id="sweep"></div>
+  <div id="vignette"></div>
+
+  <!-- Glitch overlay -->
+  <div id="glitch-overlay"></div>
+
+  <!-- Data feed -->
+  <div id="data-feed"><div id="data-feed-inner"></div></div>
+
+  <!-- Crosshair -->
+  <div id="crosshair-h"></div>
+  <div id="crosshair-v"></div>
+  <div id="crosshair-dot"></div>
+  <div id="hold-ring"></div>
+
+  <!-- Status bar -->
+  <div id="status"><span id="status-text"></span><span id="status-cursor">_</span></div>
+  <div id="pos-debug">X: 0.000<br>Y: 0.000</div>
+  <div id="mock-hint">ARROW KEYS / WASD to move · R to reset</div>
+
+  <!-- Solved overlay -->
+  <div id="solved-overlay">
+    <div class="solved-text">TARGET LOCKED</div>
+  </div>
+
+  <script src="app.js"></script>
+
+</body>
+</html>
