@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vehicle Selector — Mission: Hollywood</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+
+    /* Video fills the screen */
+    #video-player {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+
+    /* HUD overlay */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* Vehicle name — top center */
+    #vehicle-name {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(0, 220, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Navigation indicator — top center below name */
+    #nav-indicator {
+      position: absolute;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      color: rgba(0, 220, 255, 0.6);
+      letter-spacing: 8px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .nav-arrow {
+      font-size: 22px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+
+    .nav-arrow.flash {
+      opacity: 1;
+      color: #0df;
+    }
+
+    /* Vehicle dots */
+    #vehicle-dots {
+      display: flex;
+      gap: 10px;
+    }
+
+    .vehicle-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 220, 255, 0.4);
+      background: transparent;
+      transition: all 0.3s ease;
+    }
+
+    .vehicle-dot.active {
+      background: #0df;
+      border-color: #0df;
+      box-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+    }
+
+    /* Lever display — bottom center */
+    #lever-display {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 30px;
+      align-items: flex-end;
+    }
+
+    .lever-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .lever-label {
+      font-size: 10px;
+      color: rgba(0, 220, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .lever-track {
+      width: 8px;
+      height: 80px;
+      background: rgba(0, 220, 255, 0.1);
+      border: 1px solid rgba(0, 220, 255, 0.2);
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .lever-knob {
+      position: absolute;
+      left: -6px;
+      width: 20px;
+      height: 12px;
+      background: #0df;
+      border-radius: 3px;
+      box-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+      transition: bottom 0.15s ease;
+    }
+
+    .lever-value {
+      font-size: 18px;
+      color: #0df;
+      font-weight: bold;
+      text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+    }
+
+    /* Feedback flash */
+    #feedback-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #feedback-flash.correct {
+      background: rgba(0, 255, 100, 0.2);
+      opacity: 1;
+    }
+
+    #feedback-flash.wrong {
+      background: rgba(255, 50, 50, 0.2);
+      opacity: 1;
+    }
+
+    /* Feedback text */
+    #feedback-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 48px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 15;
+      text-shadow: 0 0 30px currentColor;
+    }
+
+    #feedback-text.visible {
+      opacity: 1;
+    }
+
+    #feedback-text.correct {
+      color: #0f6;
+    }
+
+    #feedback-text.wrong {
+      color: #f33;
+    }
+
+    #feedback-text.solved {
+      color: #0f6;
+    }
+
+    /* Status text */
+    #status-text {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: rgba(0, 220, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* Scanlines */
+    #scanlines {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Vignette */
+    #vignette {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.6) 100%);
+      pointer-events: none;
+      z-index: 21;
+    }
+
+    /* Start overlay */
+    #start-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #start-overlay .start-text {
+      font-size: 24px;
+      color: #0df;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    #start-overlay .start-sub {
+      font-size: 12px;
+      color: rgba(0, 220, 255, 0.4);
+      margin-top: 12px;
+      letter-spacing: 2px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Preload */
+    #preload-status {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.4);
+      letter-spacing: 2px;
+      z-index: 201;
+      transition: opacity 1s ease;
+    }
+
+    /* Mock controls */
+    #mock-controls {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(0, 220, 255, 0.3);
+      padding: 10px;
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.7);
+      pointer-events: auto;
+    }
+
+    #mock-controls.visible { display: block; }
+    #mock-controls div { margin: 3px 0; }
+
+    /* Debug state */
+    #debug-state {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.5);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <video id="video-player" muted loop></video>
+
+  <div id="feedback-flash"></div>
+  <div id="feedback-text"></div>
+
+  <div id="hud">
+    <div id="vehicle-name"></div>
+    <div id="nav-indicator">
+      <span class="nav-arrow" id="arrow-left">&#9664;</span>
+      <div id="vehicle-dots"></div>
+      <span class="nav-arrow" id="arrow-right">&#9654;</span>
+    </div>
+    <div id="lever-display"></div>
+    <div id="status-text"></div>
+  </div>
+
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+
+  <div id="mock-controls">
+    <div><strong>DEV CONTROLS</strong></div>
+    <div>Left/Right: browse vehicles</div>
+    <div>Q/A W/S E/D R/F: levers 1-4</div>
+    <div>Enter: validate</div>
+    <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
+    <div>X = Activate | C = Reset | V = Force Solve</div>
+  </div>
+
+  <div id="debug-state"></div>
+
+  <div id="start-overlay">
+    <div class="start-text">Click to start</div>
+    <div class="start-sub">or press any key</div>
+  </div>
+
+  <div id="preload-status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "puzzle-4-vehicle",
+  "version": "1.0.0",
+  "description": "Vehicle Selector puzzle — Mission: Hollywood escape room",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js --mock"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "onoff": "^6.0.3"
+  }
+}
