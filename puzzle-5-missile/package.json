@@ -1,0 +1,16 @@
+{
+  "name": "puzzle-5-missile",
+  "version": "1.0.0",
+  "description": "Missile Redirect puzzle — Mission: Hollywood escape room",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js --mock"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "onoff": "^6.0.3"
+  }
+}

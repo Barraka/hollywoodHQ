@@ -18,17 +18,34 @@ This project is part of the **Escape Yourself** escape room company ecosystem. T
 
 ## Current State
 
-- **Puzzle 2 (World Map Locator)** — Fully implemented in `puzzle-2-world-map/`. Node.js backend + browser frontend. Run `npm run dev` for mock mode. See its own `CLAUDE.md` for details.
-- **Puzzles 1, 3, 4, 5** — Specification only (`Explanations.txt`).
+| Puzzle | Directory | Port | Status |
+|---|---|---|---|
+| 1 — Simon | — | — | Not started |
+| 2 — World Map Locator | `puzzle-2-world-map/` | 3000 | Implemented |
+| 3 — Gadget Code | `puzzle-3-gadget-code/` | 3001 | Implemented |
+| 4 — Vehicle Selector | `puzzle-4-vehicle/` | 3002 | Implemented |
+| 5 — Missile Redirect | `puzzle-5-missile/` | 3003 | Implemented |
 
-## Architecture Context
+Each puzzle has its own `CLAUDE.md` with architecture details, commands, and GPIO pin mappings.
 
-When implementation begins, each puzzle will likely need:
-- A **frontend display** (screens on the console showing visuals/feedback)
-- **Hardware I/O integration** (buttons, rotary knobs, numpad, levers, joystick)
-- **Communication with the Room Controller** (the MiniPC that manages props, runs on WebSocket port 3001 and HTTP port 3002)
+### Running in dev mode
 
-The Room Controller protocol uses WebSocket messages for prop state (`prop_update`, `prop_online/offline`) and session management (`session_cmd`). Props report sensor triggers and receive commands like `force_solve` and `reset`.
+```bash
+cd puzzle-2-world-map && npm run dev   # http://localhost:3000
+cd puzzle-3-gadget-code && npm run dev # http://localhost:3001
+cd puzzle-4-vehicle && npm run dev     # http://localhost:3002
+cd puzzle-5-missile && npm run dev     # http://localhost:3003
+```
+
+All puzzles use `--mock` flag for development (keyboard input, no GPIO). Each has a click-to-start overlay and auto-activates in mock mode.
+
+## Architecture
+
+- **Runtime**: Node.js backend + browser frontend (Chromium kiosk on Raspberry Pi)
+- **Communication**: WebSocket (`ws` package) between server and browser, same port as HTTP
+- **Hardware I/O**: `onoff` package for GPIO (optional dependency, mock fallback if unavailable)
+- **Shared hardware**: Raspberry Pi 4/5 with dual HDMI manages all puzzles. Puzzle 2 & 5 share HDMI 1 (world map), Puzzle 3 shares HDMI 2 (virtual assistant)
+- **Room Controller**: WebSocket integration placeholder in each puzzle (set `roomControllerUrl` in config)
 
 ## Related Projects
 

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Missile Redirect — Mission: Hollywood</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a14;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+
+    /* Map container */
+    #map-container {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #map-container svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 2px rgba(0, 220, 255, 0.2));
+    }
+
+    /* Map land styling */
+    #map-container svg path {
+      fill: #162030;
+      stroke: #1a3a50;
+      stroke-width: 0.5;
+    }
+
+    /* City dots */
+    .city-dot-svg {
+      fill: rgba(0, 220, 255, 0.5);
+      filter: drop-shadow(0 0 3px rgba(0, 220, 255, 0.4));
+    }
+
+    /* Missile trajectory line */
+    .trajectory-line {
+      stroke: rgba(255, 50, 50, 0.4);
+      stroke-width: 2;
+      stroke-dasharray: 8 4;
+      fill: none;
+    }
+
+    .trajectory-line.active {
+      stroke: rgba(255, 50, 50, 0.8);
+      stroke-width: 2.5;
+    }
+
+    .trajectory-line.reversed {
+      stroke: rgba(0, 255, 100, 0.6);
+      stroke-width: 2.5;
+      stroke-dasharray: none;
+    }
+
+    /* Waypoint markers */
+    .waypoint-marker {
+      fill: rgba(255, 50, 50, 0.6);
+      stroke: rgba(255, 50, 50, 0.8);
+      stroke-width: 1;
+    }
+
+    .waypoint-marker.origin {
+      fill: rgba(255, 200, 0, 0.8);
+      stroke: rgba(255, 200, 0, 1);
+    }
+
+    .waypoint-marker.current {
+      fill: rgba(0, 220, 255, 1);
+      stroke: rgba(0, 220, 255, 1);
+      filter: drop-shadow(0 0 6px rgba(0, 220, 255, 0.8));
+    }
+
+    .waypoint-marker.reversed {
+      fill: rgba(0, 255, 100, 0.8);
+      stroke: rgba(0, 255, 100, 1);
+    }
+
+    /* Waypoint labels */
+    .waypoint-label {
+      fill: rgba(255, 255, 255, 0.7);
+      font-family: 'Courier New', monospace;
+      font-size: 7px;
+      text-anchor: middle;
+    }
+
+    /* Missile marker */
+    #missile-marker {
+      fill: #ff3333;
+      filter: drop-shadow(0 0 8px rgba(255, 50, 50, 0.9));
+      transition: cx 0.8s ease-in-out, cy 0.8s ease-in-out;
+    }
+
+    /* Missile pulse ring */
+    #missile-pulse {
+      fill: none;
+      stroke: rgba(255, 50, 50, 0.5);
+      stroke-width: 1;
+    }
+
+    @keyframes missilePulse {
+      0% { r: 4; opacity: 1; }
+      100% { r: 15; opacity: 0; }
+    }
+
+    /* HUD overlays */
+    #hud {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #progress-bar {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .progress-segment {
+      width: 30px;
+      height: 6px;
+      background: rgba(255, 50, 50, 0.3);
+      border: 1px solid rgba(255, 50, 50, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .progress-segment.reversed {
+      background: rgba(0, 255, 100, 0.6);
+      border-color: rgba(0, 255, 100, 0.8);
+      box-shadow: 0 0 6px rgba(0, 255, 100, 0.4);
+    }
+
+    #direction-hint {
+      position: absolute;
+      top: 55px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      color: rgba(0, 220, 255, 0.6);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    #status-text {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(0, 220, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* Feedback flash */
+    #feedback-flash {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #feedback-flash.correct { background: rgba(0, 255, 100, 0.1); opacity: 1; }
+    #feedback-flash.wrong { background: rgba(255, 50, 50, 0.15); opacity: 1; }
+
+    /* Solved overlay */
+    #solved-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #solved-overlay.visible {
+      opacity: 1;
+    }
+
+    #solved-overlay .solved-text {
+      font-size: 48px;
+      color: #0f6;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      text-shadow: 0 0 30px rgba(0, 255, 100, 0.6);
+    }
+
+    /* Background effects */
+    .bg-grid {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-image:
+        linear-gradient(rgba(0, 220, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 220, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #scanlines {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    #vignette {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+      pointer-events: none;
+      z-index: 21;
+    }
+
+    /* Start overlay */
+    #start-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    #start-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    #start-overlay .start-text {
+      font-size: 24px;
+      color: #0df;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    #start-overlay .start-sub {
+      font-size: 12px;
+      color: rgba(0, 220, 255, 0.4);
+      margin-top: 12px;
+      letter-spacing: 2px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Mock controls */
+    #mock-controls {
+      display: none;
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(0, 220, 255, 0.3);
+      padding: 10px;
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.7);
+      pointer-events: auto;
+    }
+
+    #mock-controls.visible { display: block; }
+    #mock-controls div { margin: 3px 0; }
+
+    #debug-state {
+      position: absolute;
+      top: 10px; left: 10px;
+      z-index: 100;
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.5);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div id="map-container"></div>
+
+  <div id="feedback-flash"></div>
+
+  <div id="hud">
+    <div id="progress-bar"></div>
+    <div id="direction-hint"></div>
+    <div id="status-text"></div>
+  </div>
+
+  <div id="solved-overlay">
+    <div class="solved-text">Missile neutralized</div>
+  </div>
+
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+
+  <div id="mock-controls">
+    <div><strong>DEV CONTROLS</strong></div>
+    <div>Arrow keys: joystick</div>
+    <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
+    <div>X = Activate | C = Reset | V = Force Solve</div>
+  </div>
+
+  <div id="debug-state"></div>
+
+  <div id="start-overlay">
+    <div class="start-text">Click to start</div>
+    <div class="start-sub">or press any key</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
