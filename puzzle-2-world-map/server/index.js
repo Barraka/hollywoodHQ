@@ -6,6 +6,7 @@ const config = require('../config');
 const Encoders = require('./encoders');
 const Audio = require('./audio');
 const PuzzleLogic = require('./puzzleLogic');
+const RoomControllerClient = require('../../shared/roomController');
 
 // --- Detect mock mode ---
 const isMock = process.argv.includes('--mock');
@@ -112,12 +113,44 @@ if (isMock) {
   };
 }
 
-// --- Room Controller connection (optional) ---
-if (config.roomControllerUrl) {
-  // TODO: Connect to Room Controller WebSocket
-  // Report online status, listen for force_solve/reset commands
-  console.log('[rc] Room Controller integration not yet implemented');
-}
+// --- Room Controller integration ---
+const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
+
+rc.on('command', (cmd) => {
+  console.log('[rc] Executing command:', cmd.command);
+
+  try {
+    switch (cmd.command) {
+      case 'force_solve':
+        puzzle.forceSolve();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'reset':
+        puzzle.reset();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      default:
+        console.log('[rc] Unknown command:', cmd.command);
+        rc.sendAck(cmd.requestId, false, 'Unknown command');
+    }
+  } catch (err) {
+    console.error('[rc] Command failed:', err);
+    rc.sendAck(cmd.requestId, false, err.message);
+  }
+});
+
+// Wire puzzle state changes to Room Controller
+puzzle.on('solved', () => {
+  rc.updateState({ state: 'solved', progress: 1.0 });
+});
+
+puzzle.on('reset', () => {
+  rc.updateState({ state: 'active', progress: 0 });
+});
+
+rc.connect();
 
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
@@ -128,6 +161,7 @@ httpServer.listen(config.httpPort, () => {
 // --- Graceful shutdown ---
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
+  rc.disconnect();
   encoders.destroy();
   audio.destroy();
   httpServer.close();

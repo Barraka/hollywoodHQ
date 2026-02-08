@@ -26,6 +26,8 @@ This project is part of the **Escape Yourself** escape room company ecosystem. T
 | 4 — Vehicle Selector | `puzzle-4-vehicle/` | 3002 | Implemented |
 | 5 — Missile Redirect | `puzzle-5-missile/` | 3003 | Implemented |
 
+**Room Controller Integration:** ✅ Implemented for all 5 puzzles
+
 Each puzzle has its own `CLAUDE.md` with architecture details, commands, and GPIO pin mappings.
 
 ### Running in dev mode
@@ -69,7 +71,12 @@ See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for complete pin mapping and distri
     - GPIO: 20 unique pins ✅
 - **Communication**: WebSocket (`ws` package) between server and browser, same port as HTTP
 - **Hardware I/O**: `onoff` package for GPIO (optional dependency, mock fallback if unavailable)
-- **Room Controller**: WebSocket integration placeholder in each puzzle (set `roomControllerUrl` in config)
+- **Room Controller**: WebSocket integration implemented for all puzzles via `shared/roomController.js`
+  - Auto-connects with exponential backoff (2s → 30s max)
+  - Sends `prop_online`, `prop_update`, `prop_offline` to GM dashboard
+  - Receives `force_solve`, `reset` commands from GM
+  - Set `roomControllerUrl` in each puzzle's `config.js` to enable (default: null/disabled)
+  - See [shared/README.md](shared/README.md) for usage details
 
 ## GPIO Pin Usage Summary
 

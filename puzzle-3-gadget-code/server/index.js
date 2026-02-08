@@ -6,6 +6,7 @@ const config = require('../config');
 const LEDs = require('./leds');
 const Keypad = require('./keypad');
 const PuzzleLogic = require('./puzzleLogic');
+const RoomControllerClient = require('../../shared/roomController');
 
 // --- Detect mock mode ---
 const isMock = process.argv.includes('--mock');
@@ -216,10 +217,43 @@ if (isMock) {
   console.log('[server] Mock mode: puzzle will auto-activate when client sends "ready"');
 }
 
-// --- Room Controller connection (optional) ---
-if (config.roomControllerUrl) {
-  console.log('[rc] Room Controller integration not yet implemented');
-}
+// --- Room Controller integration ---
+const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
+
+rc.on('command', (cmd) => {
+  console.log('[rc] Executing command:', cmd.command);
+
+  try {
+    switch (cmd.command) {
+      case 'force_solve':
+        puzzle.forceSolve();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'reset':
+        puzzle.reset();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      default:
+        console.log('[rc] Unknown command:', cmd.command);
+        rc.sendAck(cmd.requestId, false, 'Unknown command');
+    }
+  } catch (err) {
+    console.error('[rc] Command failed:', err);
+    rc.sendAck(cmd.requestId, false, err.message);
+  }
+});
+
+// Wire puzzle state changes to Room Controller
+puzzle.on('stateChange', (state) => {
+  rc.updateState({
+    state: state.state,
+    progress: state.solvedCount / config.situations.length
+  });
+});
+
+rc.connect();
 
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
@@ -231,6 +265,7 @@ httpServer.listen(config.httpPort, () => {
 // --- Graceful shutdown ---
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
+  rc.disconnect();
   leds.destroy();
   keypad.destroy();
   httpServer.close();
