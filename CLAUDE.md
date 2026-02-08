@@ -28,6 +28,8 @@ This project is part of the **Escape Yourself** escape room company ecosystem. T
 
 **Room Controller Integration:** ✅ Implemented for all 5 puzzles
 
+**Raspberry Pi Deployment:** ✅ Automated setup scripts ready
+
 Each puzzle has its own `CLAUDE.md` with architecture details, commands, and GPIO pin mappings.
 
 ### Running in dev mode
@@ -41,6 +43,26 @@ cd puzzle-5-missile && npm run dev     # http://localhost:3003
 ```
 
 All puzzles use `--mock` flag for development (keyboard input, no GPIO). Each has a click-to-start overlay and auto-activates in mock mode.
+
+### Deploying to Raspberry Pi
+
+Automated deployment scripts in `raspberry-pi/` directory:
+
+```bash
+# Props Pi (Puzzles 1, 2, 5 + World Map Display)
+cd raspberry-pi
+sudo ./setup-props-pi.sh
+sudo ./configure-room-controller.sh ws://192.168.1.100:3001
+sudo reboot
+
+# Narrative Pi (Puzzles 3, 4 + Story Screen)
+cd raspberry-pi
+sudo ./setup-narrative-pi.sh
+sudo ./configure-room-controller.sh ws://192.168.1.100:3001
+sudo reboot
+```
+
+See [raspberry-pi/README.md](raspberry-pi/README.md) for complete setup guide, service management, and troubleshooting.
 
 ## Hardware Status
 
@@ -77,6 +99,11 @@ See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for complete pin mapping and distri
   - Receives `force_solve`, `reset` commands from GM
   - Set `roomControllerUrl` in each puzzle's `config.js` to enable (default: null/disabled)
   - See [shared/README.md](shared/README.md) for usage details
+- **Deployment**: Automated Raspberry Pi setup via `raspberry-pi/` scripts
+  - One-command setup per Pi: `sudo ./setup-props-pi.sh` or `sudo ./setup-narrative-pi.sh`
+  - Installs Node.js, dependencies, systemd services, Chromium kiosk mode
+  - Auto-start on boot, auto-restart on crash, centralized logging
+  - See [raspberry-pi/README.md](raspberry-pi/README.md) for details
 
 ## GPIO Pin Usage Summary
 
