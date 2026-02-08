@@ -1,0 +1,18 @@
+[Unit]
+Description=Chromium Kiosk Mode - Narrative Pi (Story Screen)
+After=graphical.target puzzle-3-gadget-code.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/home/pi/hollywoodHQ/raspberry-pi/scripts/start-kiosk-narrative.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target

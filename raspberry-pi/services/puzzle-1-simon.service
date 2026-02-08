@@ -1,0 +1,19 @@
+[Unit]
+Description=Mission Hollywood - Puzzle 1 (Simon)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/hollywoodHQ/puzzle-1-simon
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Mission Hollywood - Puzzle 5 (Missile Trajectory)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/hollywoodHQ/puzzle-5-missile
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
