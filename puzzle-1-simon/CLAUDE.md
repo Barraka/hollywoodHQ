@@ -1,13 +1,14 @@
 # Puzzle 1: Simon Game — Documentation
 
 ## Overview
-Classic 4-button Simon game with illuminated arcade buttons. Buttons blink in random sequence. Players must press each button when it lights up. Once all 4 buttons have been successfully pressed, the puzzle is solved and the HQ reactivates.
+10-button Simon game with illuminated arcade buttons (all same color). Buttons blink at random intervals. Players must press each button the moment it lights up. Once all 10 buttons have been successfully pressed, the puzzle is solved and the HQ reactivates.
 
 ## Architecture
 - **Port**: 3004
-- **Display**: None required (can run headless or show web UI)
-- **Hardware**: 4 arcade buttons with integrated LEDs (red, blue, green, yellow)
-- **GPIO Requirements**: 8 pins (4 button inputs - shared with Puzzle 2 & 5, 4 LED outputs - unique)
+- **Raspberry Pi**: Props Pi (#1) - Controls physical props, HDMI to world map
+- **Display**: None required for this puzzle (can run headless or show web UI)
+- **Hardware**: 10 arcade buttons with integrated LEDs (all same color - white/blue recommended)
+- **GPIO Requirements**: 20 pins (10 button inputs: 4 shared + 6 unique, 10 LED outputs: all unique)
 
 ## Game Mechanics
 
@@ -18,11 +19,11 @@ Classic 4-button Simon game with illuminated arcade buttons. Buttons blink in ra
 
 ### Gameplay Flow
 1. GM activates puzzle via Room Controller → Enter ACTIVE state
-2. Each of the 4 buttons blinks at its own random interval (1-3 seconds between blinks)
+2. Each of the 10 buttons blinks at its own random interval (1-3 seconds between blinks)
 3. When a button lights up, player must press it
 4. **Correct press** (button is lit): LED stays on permanently, button "locked", +1 progress
 5. **Wrong press** (button not lit): All LEDs flash briefly, no penalty, game continues
-6. When all 4 buttons locked → SOLVED
+6. When all 10 buttons locked → SOLVED
 
 ### Difficulty
 - **1/10**: Simple pattern recognition, no time pressure
@@ -40,7 +41,7 @@ Open http://localhost:3004
 
 **Mock Controls:**
 - Click buttons directly to simulate presses
-- Number keys 1-4 for buttons 1-4
+- Number keys 1-9, 0 for buttons 1-10
 - X = Activate puzzle
 - C = Reset
 - V = Force solve (GM cheat)
@@ -51,16 +52,22 @@ npm install
 npm start
 ```
 
-## GPIO Pin Mapping (BCM)
+## GPIO Pin Mapping (BCM) - Props Pi
 
-| Button | Button Pin | LED Pin | Color  | Pin Sharing |
-|--------|-----------|---------|--------|-------------|
-| 1      | GPIO 16   | GPIO 22 | Red    | Shared with Puzzle 2 & 5 |
-| 2      | GPIO 19   | GPIO 23 | Blue   | Shared with Puzzle 2 & 5 |
-| 3      | GPIO 20   | GPIO 1  | Green  | Shared with Puzzle 2 & 5 |
-| 4      | GPIO 26   | GPIO 0  | Yellow | Shared with Puzzle 2 & 5 |
+| Button | Button Pin | LED Pin | Pin Sharing |
+|--------|-----------|---------|-------------|
+| 1      | GPIO 16   | GPIO 0  | Button shared with Puzzle 2 & 5 |
+| 2      | GPIO 19   | GPIO 1  | Button shared with Puzzle 2 & 5 |
+| 3      | GPIO 20   | GPIO 22 | Button shared with Puzzle 2 & 5 |
+| 4      | GPIO 26   | GPIO 23 | Button shared with Puzzle 2 & 5 |
+| 5      | GPIO 5    | GPIO 2  | Unique |
+| 6      | GPIO 6    | GPIO 3  | Unique |
+| 7      | GPIO 13   | GPIO 4  | Unique |
+| 8      | GPIO 27   | GPIO 7  | Unique |
+| 9      | GPIO 17   | GPIO 8  | Unique |
+| 10     | GPIO 14   | GPIO 9  | Unique |
 
-**Pin Sharing Note:** Button input pins are safely reused from Puzzles 2 (Encoders) and 5 (Joystick) since puzzles run sequentially, not simultaneously. LED output pins are unique to this puzzle.
+**Pin Sharing Note:** Button input pins 1-4 (GPIO 16, 19, 20, 26) are safely reused from Puzzles 2 (Encoders) and 5 (Joystick) since puzzles run sequentially on the same Pi. All LED output pins are unique to this puzzle.
 
 **Wiring:**
 - **Button**: Connect between GPIO pin and GND (internal pull-up enabled)
@@ -72,11 +79,8 @@ npm start
 - **Size**: 45mm or 60mm diameter
 - **Type**: Momentary push button with built-in LED
 - **Voltage**: 5V or 12V LEDs (check resistor requirements)
-- **Quantity**: 4 buttons (classic Simon colors)
-  - 1x Red
-  - 1x Blue
-  - 1x Green
-  - 1x Yellow
+- **Color**: All same color (white or blue recommended for uniform appearance)
+- **Quantity**: 10 buttons
 
 ### Suppliers
 - **Recommended**: AliExpress illuminated arcade buttons
@@ -86,10 +90,10 @@ npm start
 - SparkFun: COM-09336
 
 ### Cost Estimate
-- Buttons: $3-4 each × 4 = $12-16
+- Buttons: $3-4 each × 10 = $30-40
 - Resistors (220Ω): ~$2 for pack
-- Wire: ~$5
-- **Total**: ~$20-25
+- Wire: ~$10
+- **Total**: ~$42-52
 
 ## Configuration (`config.js`)
 
@@ -97,13 +101,15 @@ npm start
 module.exports = {
   httpPort: 3004,
 
-  // Classic 4-button Simon game
-  // Button pins shared with Puzzle 2 & 5 (sequential execution)
+  // 10-button Simon: All same color, press when lit
+  // Runs on Props Pi, button pins 1-4 shared with Puzzle 2 & 5
   buttons: [
-    { id: 1, buttonPin: 16, ledPin: 22, color: 'red' },
-    { id: 2, buttonPin: 19, ledPin: 23, color: 'blue' },
-    { id: 3, buttonPin: 20, ledPin: 1,  color: 'green' },
-    { id: 4, buttonPin: 26, ledPin: 0,  color: 'yellow' },
+    { id: 1,  buttonPin: 16, ledPin: 0,  color: 'white' }, // Shared
+    { id: 2,  buttonPin: 19, ledPin: 1,  color: 'white' }, // Shared
+    { id: 3,  buttonPin: 20, ledPin: 22, color: 'white' }, // Shared
+    { id: 4,  buttonPin: 26, ledPin: 23, color: 'white' }, // Shared
+    { id: 5,  buttonPin: 5,  ledPin: 2,  color: 'white' }, // Unique
+    // ... buttons 6-10
   ],
 
   // Timing (milliseconds)

@@ -3,15 +3,21 @@ module.exports = {
   httpPort: 3004,
 
   // Button GPIO pins (BCM numbering)
-  // Classic 4-button Simon game: Red, Blue, Green, Yellow
-  // NOTE: Button pins are shared with Puzzle 2 (Encoders) and Puzzle 5 (Joystick)
+  // 10-button Simon: All same color, players press when lit
+  // Runs on Props Pi (Raspberry Pi #1)
+  // Button pins 1-4 shared with Puzzle 2 (Encoders) and Puzzle 5 (Joystick)
   // This is safe because puzzles run sequentially
-  // LED pins are unique to this puzzle
   buttons: [
-    { id: 1, buttonPin: 16, ledPin: 22, color: 'red' },    // Button shared with Puzzle 2 & 5
-    { id: 2, buttonPin: 19, ledPin: 23, color: 'blue' },   // Button shared with Puzzle 2 & 5
-    { id: 3, buttonPin: 20, ledPin: 1,  color: 'green' },  // Button shared with Puzzle 2 & 5
-    { id: 4, buttonPin: 26, ledPin: 0,  color: 'yellow' }, // Button shared with Puzzle 2 & 5
+    { id: 1,  buttonPin: 16, ledPin: 0,  color: 'white' }, // Button shared with Puzzle 2 & 5
+    { id: 2,  buttonPin: 19, ledPin: 1,  color: 'white' }, // Button shared with Puzzle 2 & 5
+    { id: 3,  buttonPin: 20, ledPin: 22, color: 'white' }, // Button shared with Puzzle 2 & 5
+    { id: 4,  buttonPin: 26, ledPin: 23, color: 'white' }, // Button shared with Puzzle 2 & 5
+    { id: 5,  buttonPin: 5,  ledPin: 2,  color: 'white' }, // Unique button pins
+    { id: 6,  buttonPin: 6,  ledPin: 3,  color: 'white' },
+    { id: 7,  buttonPin: 13, ledPin: 4,  color: 'white' },
+    { id: 8,  buttonPin: 27, ledPin: 7,  color: 'white' },
+    { id: 9,  buttonPin: 17, ledPin: 8,  color: 'white' },
+    { id: 10, buttonPin: 14, ledPin: 9,  color: 'white' },
   ],
 
   // Timing (milliseconds)

@@ -1,52 +1,85 @@
 # GPIO Pin Allocation - Mission: Hollywood
 
-Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 2-27).
+**2 Raspberry Pi Setup:**
+- **Props Pi (#1)**: Puzzles 1, 2, 5 - Physical props, world map display
+- **Narrative Pi (#2)**: Puzzles 3, 4 - Story screen, guidance
 
-## Strategy: Sequential Pin Sharing
+Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 0-27).
 
-Puzzles are solved sequentially (not simultaneously), so different puzzles can share the same GPIO pins safely. When one puzzle ends, its GPIO pins are freed for the next puzzle.
+## Strategy: 2-Pi Distribution + Sequential Pin Sharing
 
----
-
-## Master Pin Allocation Table
-
-| GPIO Pin | Puzzle 1 (Simon) | Puzzle 2 (Map) | Puzzle 3 (Gadget) | Puzzle 4 (Vehicle) | Puzzle 5 (Missile) |
-|----------|------------------|----------------|-------------------|--------------------|---------------------|
-| **0** | **LED 4** | — | — | — | — |
-| **1** | **LED 3** | — | — | — | — |
-| **2** | — | — | — | Lever1 Pos2 | — |
-| **3** | — | — | — | Lever1 Pos4 | — |
-| **4** | — | — | — | Lever1 Pos8 | — |
-| **5** | — | — | — | Nav Left | — |
-| **6** | — | — | — | Nav Right | — |
-| **7** | — | — | — | Lever2 Pos3 | — |
-| **8** | — | — | — | Lever2 Pos7 | — |
-| **9** | — | — | — | Lever2 Pos9 | — |
-| **10** | — | — | — | Lever3 Pos2 | — |
-| **11** | — | — | — | Lever3 Pos4 | — |
-| **12** | — | — | **LED 3** | — | — |
-| **13** | — | — | — | Validate Btn | — |
-| **14** | — | — | — | Lever3 Pos8 | — |
-| **15** | — | — | — | Lever4 Pos1 | — |
-| **16** | **Button 1 IN** | X Encoder CLK | — | — | **Joystick Up** |
-| **17** | — | — | **Keypad D0** | — | — |
-| **18** | — | — | — | Lever4 Pos5 | — |
-| **19** | **Button 2 IN** | Y Encoder CLK | — | — | **Joystick Left** |
-| **20** | **Button 3 IN** | X Encoder DT | — | — | **Joystick Down** |
-| **21** | — | — | — | Lever4 Pos6 | — |
-| **22** | **LED 1** | — | — | — | — |
-| **23** | **LED 2** | — | — | — | — |
-| **24** | — | — | **LED 1** | — | — |
-| **25** | — | — | **LED 2** | — | — |
-| **26** | **Button 4 IN** | Y Encoder DT | — | — | **Joystick Right** |
-| **27** | — | — | **Keypad D1** | — | — |
+- **Distribution**: Props vs Narrative puzzles split across 2 Pis (20 pins each)
+- **Sequential Sharing**: Props Pi shares GPIO 16, 19, 20, 26 across Puzzles 1, 2, 5 (safe - puzzles run sequentially)
 
 ---
 
-## Pin Sharing Groups
+## Props Pi (Raspberry Pi #1) - Pin Allocation
 
-### Group A: Puzzle 1 (Simon) ↔ Puzzle 2 (World Map) ↔ Puzzle 5 (Missile)
-**Shared pins:** GPIO 16, 19, 20, 26
+**Puzzles**: 1 (Simon), 2 (World Map), 5 (Missile)
+
+| GPIO Pin | Puzzle 1 (Simon) | Puzzle 2 (Map) | Puzzle 5 (Missile) |
+|----------|------------------|----------------|---------------------|
+| **0** | **Button 1 LED** | — | — |
+| **1** | **Button 2 LED** | — | — |
+| **2** | **Button 5 LED** | — | — |
+| **3** | **Button 6 LED** | — | — |
+| **4** | **Button 7 LED** | — | — |
+| **5** | **Button 5 IN** | — | — |
+| **6** | **Button 6 IN** | — | — |
+| **7** | **Button 8 LED** | — | — |
+| **8** | **Button 9 LED** | — | — |
+| **9** | **Button 10 LED** | — | — |
+| **13** | **Button 7 IN** | — | — |
+| **14** | **Button 10 IN** | — | — |
+| **16** | **Button 1 IN** | **X Encoder CLK** | **Joystick Up** |
+| **17** | **Button 9 IN** | — | — |
+| **19** | **Button 2 IN** | **Y Encoder CLK** | **Joystick Left** |
+| **20** | **Button 3 IN** | **X Encoder DT** | **Joystick Down** |
+| **22** | **Button 3 LED** | — | — |
+| **23** | **Button 4 LED** | — | — |
+| **26** | **Button 4 IN** | **Y Encoder DT** | **Joystick Right** |
+| **27** | **Button 8 IN** | — | — |
+
+**Total Props Pi Pins**: 20 (16 unique + 4 shared) ✅
+
+---
+
+## Narrative Pi (Raspberry Pi #2) - Pin Allocation
+
+**Puzzles**: 3 (Gadget Code), 4 (Vehicle Selector)
+
+| GPIO Pin | Puzzle 3 (Gadget) | Puzzle 4 (Vehicle) |
+|----------|-------------------|--------------------|
+| **2** | — | Lever1 Pos2 |
+| **3** | — | Lever1 Pos4 |
+| **4** | — | Lever1 Pos8 |
+| **5** | — | Nav Left |
+| **6** | — | Nav Right |
+| **7** | — | Lever2 Pos3 |
+| **8** | — | Lever2 Pos7 |
+| **9** | — | Lever2 Pos9 |
+| **10** | — | Lever3 Pos2 |
+| **11** | — | Lever3 Pos4 |
+| **12** | **LED 3** | — |
+| **13** | — | Validate Btn |
+| **14** | — | Lever3 Pos8 |
+| **15** | — | Lever4 Pos1 |
+| **17** | **Keypad D0** | — |
+| **18** | — | Lever4 Pos5 |
+| **21** | — | Lever4 Pos6 |
+| **24** | **LED 1** | — |
+| **25** | **LED 2** | — |
+| **27** | **Keypad D1** | — |
+
+**Total Narrative Pi Pins**: 20 (all unique) ✅
+
+---
+
+## Pin Sharing (Props Pi Only)
+
+### Shared pins: GPIO 16, 19, 20, 26
+
+**Puzzles 1, 2, 5 share these 4 pins on Props Pi:**
 
 | Pin | Puzzle 1 Use | Puzzle 2 Use | Puzzle 5 Use |
 |-----|--------------|--------------|--------------|
@@ -55,70 +88,74 @@ Puzzles are solved sequentially (not simultaneously), so different puzzles can s
 | GPIO 20 | Button 3 Input | X Encoder DT | Joystick Down |
 | GPIO 26 | Button 4 Input | Y Encoder DT | Joystick Right |
 
-**Why it works:** All three puzzles run sequentially (1 → 2 → 5). When one puzzle ends, its GPIO pins are freed for the next puzzle. Puzzles 2 and 5 also share the same world map display (HDMI 1).
+**Why it works:** All three puzzles run sequentially (1 → 2 → 5) on the same Pi. When one puzzle ends, its GPIO pins are freed for the next puzzle. Puzzles 2 and 5 also share the same world map display.
 
 ---
 
 ## Total Pin Usage
 
-### Without Sharing:
-- Puzzle 1: 8 pins (4 buttons + 4 LEDs)
+### Without 2-Pi Distribution (Single Pi):
+- Puzzle 1: 20 pins (10 buttons + 10 LEDs)
 - Puzzle 2: 4 pins
 - Puzzle 3: 5 pins
 - Puzzle 4: 15 pins
 - Puzzle 5: 4 pins
-- **Total: 36 pins** ❌ (exceeds 28 available)
+- **Total: 48 pins** ❌❌ (exceeds 28 available by 20!)
 
-### With Sharing:
-- Puzzle 1: 8 pins (4 button inputs shared with Puzzle 2 & 5, 4 LED outputs unique)
-- Puzzle 2: 4 pins (all shared with Puzzle 1 & 5)
-- Puzzle 3: 5 pins (unique)
-- Puzzle 4: 15 pins (unique)
-- Puzzle 5: 4 pins (all shared with Puzzle 1 & 2)
-- **Total unique pins: 24 pins** ✅ (within capacity!)
+### With 2-Pi Distribution:
+
+**Props Pi:**
+- Puzzle 1: 16 unique pins (10 button inputs: 4 shared + 6 unique, 10 LED outputs)
+- Puzzle 2: 4 shared pins (with Puzzle 1 & 5)
+- Puzzle 5: 4 shared pins (with Puzzle 1 & 2)
+- **Props Pi Total: 20 pins** ✅
+
+**Narrative Pi:**
+- Puzzle 3: 5 pins (2 keypad + 3 LEDs)
+- Puzzle 4: 15 pins (12 levers + 3 buttons)
+- **Narrative Pi Total: 20 pins** ✅
+
+**Both Pis within 28-pin capacity!** 🎉
 
 ---
 
 ## Pin Assignment by Puzzle
 
-### Puzzle 1: Simon Game (8 pins: 4 shared, 4 unique)
-Classic 4-button configuration (red, blue, green, yellow):
-- Button 1 Input: GPIO 16 (shared with Puzzle 2 & 5)
-- Button 2 Input: GPIO 19 (shared with Puzzle 2 & 5)
-- Button 3 Input: GPIO 20 (shared with Puzzle 2 & 5)
-- Button 4 Input: GPIO 26 (shared with Puzzle 2 & 5)
-- LED 1 Output: GPIO 22 (unique)
-- LED 2 Output: GPIO 23 (unique)
-- LED 3 Output: GPIO 1 (unique, safe to use - no HAT EEPROM)
-- LED 4 Output: GPIO 0 (unique, safe to use - no HAT EEPROM)
+### Props Pi (Raspberry Pi #1)
 
-### Puzzle 2: World Map Locator (4 pins - all shared)
-- X Encoder CLK: GPIO 16 (shared with Puzzle 1 & 5)
-- X Encoder DT: GPIO 20 (shared with Puzzle 1 & 5)
-- Y Encoder CLK: GPIO 19 (shared with Puzzle 1 & 5)
-- Y Encoder DT: GPIO 26 (shared with Puzzle 1 & 5)
+#### Puzzle 1: Simon Game (20 pins: 4 button inputs shared, 6 button inputs unique, 10 LED outputs unique)
+10-button configuration (all same color):
+- Button 1 Input: GPIO 16 (shared with P2 & P5), LED: GPIO 0
+- Button 2 Input: GPIO 19 (shared with P2 & P5), LED: GPIO 1
+- Button 3 Input: GPIO 20 (shared with P2 & P5), LED: GPIO 22
+- Button 4 Input: GPIO 26 (shared with P2 & P5), LED: GPIO 23
+- Button 5 Input: GPIO 5 (unique), LED: GPIO 2
+- Button 6 Input: GPIO 6 (unique), LED: GPIO 3
+- Button 7 Input: GPIO 13 (unique), LED: GPIO 4
+- Button 8 Input: GPIO 27 (unique), LED: GPIO 7
+- Button 9 Input: GPIO 17 (unique), LED: GPIO 8
+- Button 10 Input: GPIO 14 (unique), LED: GPIO 9
 
-### Puzzle 3: Gadget Code (5 pins) - UNIQUE
-- Keypad D0: GPIO 17
-- Keypad D1: GPIO 27
-- LED 1: GPIO 24
-- LED 2: GPIO 25
-- LED 3: GPIO 12
+#### Puzzle 2: World Map Locator (4 pins - all shared with P1 & P5)
+- X Encoder CLK: GPIO 16, DT: GPIO 20
+- Y Encoder CLK: GPIO 19, DT: GPIO 26
 
-### Puzzle 4: Vehicle Selector (15 pins) - UNIQUE
-- Nav Left: GPIO 5
-- Nav Right: GPIO 6
-- Validate: GPIO 13
+#### Puzzle 5: Missile Trajectory (4 pins - all shared with P1 & P2)
+- Joystick Up: GPIO 16, Down: GPIO 20
+- Joystick Left: GPIO 19, Right: GPIO 26
+
+### Narrative Pi (Raspberry Pi #2)
+
+#### Puzzle 3: Gadget Code (5 pins - all unique)
+- Keypad D0: GPIO 17, D1: GPIO 27
+- LED 1: GPIO 24, LED 2: GPIO 25, LED 3: GPIO 12
+
+#### Puzzle 4: Vehicle Selector (15 pins - all unique)
+- Nav Left: GPIO 5, Nav Right: GPIO 6, Validate: GPIO 13
 - Lever 1 positions: GPIO 2, 3, 4
 - Lever 2 positions: GPIO 7, 8, 9
 - Lever 3 positions: GPIO 10, 11, 14
 - Lever 4 positions: GPIO 15, 18, 21
-
-### Puzzle 5: Missile Trajectory (4 pins)
-- Joystick Up: GPIO 16 (shared with Puzzle 2)
-- Joystick Down: GPIO 20 (shared with Puzzle 2)
-- Joystick Left: GPIO 19 (shared with Puzzle 2)
-- Joystick Right: GPIO 26 (shared with Puzzle 2)
 
 ---
 

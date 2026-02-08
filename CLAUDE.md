@@ -42,50 +42,63 @@ All puzzles use `--mock` flag for development (keyboard input, no GPIO). Each ha
 
 ## Hardware Status
 
-✅ **All hardware sourced and configured** (24 unique GPIO pins used)
+✅ **All hardware sourced and configured** (2 Raspberry Pi setup)
 
-| Puzzle | Hardware | Status |
-|--------|----------|--------|
-| 1 — Simon | 4× Illuminated arcade buttons (red, blue, green, yellow) | ✅ Configured |
-| 2 — World Map | 2× KY-040 rotary encoders, headsets | ✅ Configured |
-| 3 — Gadget Code | Wiegand RFID keypad, 3× LEDs (3-6V green) | ✅ Configured |
-| 4 — Vehicle | 4× 10-pos rotary switches, 2× nav buttons, validate button | ✅ Configured |
-| 5 — Missile | 8-way arcade joystick (EG STARTS) | ✅ Configured |
+| Puzzle | Hardware | Raspberry Pi | Status |
+|--------|----------|--------------|--------|
+| 1 — Simon | 10× Illuminated arcade buttons (same color) | Props Pi | ✅ Configured |
+| 2 — World Map | 2× KY-040 rotary encoders, headsets | Props Pi | ✅ Configured |
+| 3 — Gadget Code | Wiegand RFID keypad, 3× LEDs (3-6V green) | Narrative Pi | ✅ Configured |
+| 4 — Vehicle | 4× 10-pos rotary switches, 2× nav buttons, validate button | Narrative Pi | ✅ Configured |
+| 5 — Missile | 8-way arcade joystick (EG STARTS) | Props Pi | ✅ Configured |
 
-See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for complete pin mapping and sharing strategy.
+See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for complete pin mapping and distribution.
 
 ## Architecture
 
 - **Runtime**: Node.js backend + browser frontend (Chromium kiosk on Raspberry Pi)
+- **Hardware**: **2 Raspberry Pi 4/5 units**
+  - **Props Pi (#1)**: Controls physical props, HDMI → world map display
+    - Puzzle 1: Simon (10 buttons)
+    - Puzzle 2: World Map (encoders, headsets)
+    - Puzzle 5: Missile (joystick)
+    - GPIO: 16 unique + 4 shared = 20 pins ✅
+  - **Narrative Pi (#2)**: Story/guidance screen (villain, Tim Ferris, instructions)
+    - Puzzle 3: Gadget Code (keypad, LEDs, virtual assistant)
+    - Puzzle 4: Vehicle Selector (levers, buttons, vehicle viewer)
+    - GPIO: 20 unique pins ✅
 - **Communication**: WebSocket (`ws` package) between server and browser, same port as HTTP
 - **Hardware I/O**: `onoff` package for GPIO (optional dependency, mock fallback if unavailable)
-- **Shared hardware**: Raspberry Pi 4/5 with dual HDMI manages all puzzles. Puzzle 2 & 5 share HDMI 1 (world map), Puzzle 3 shares HDMI 2 (virtual assistant)
 - **Room Controller**: WebSocket integration placeholder in each puzzle (set `roomControllerUrl` in config)
 
 ## GPIO Pin Usage Summary
 
-Raspberry Pi has **28 usable GPIO pins** (BCM numbering). See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for detailed pin mapping.
+Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering). See [GPIO_ALLOCATION.md](GPIO_ALLOCATION.md) for detailed pin mapping.
 
-### Pin Usage with Sequential Sharing
+### Props Pi (Raspberry Pi #1) - GPIO Usage
 
-| Puzzle | Unique Pins | Shared Pins | Total Pins | Share Group |
+| Puzzle | Button Inputs | LED Outputs | Total Pins | Pin Sharing |
 |---|---|---|---|---|
-| Puzzle 1 (Simon) | 0-2 | 4 | 4-6 | Shares with Puzzle 2 |
-| Puzzle 2 (World Map) | 0-1 | 5-6 | ~6 | Shares with Puzzle 1 & 5 |
-| Puzzle 3 (Gadget Code) | 5 | 0 | 5 | Unique (no sharing) |
-| Puzzle 4 (Vehicle) | 15 | 0 | 15 | Unique (no sharing) |
-| Puzzle 5 (Missile) | 0 | 4 | 4 | Shares with Puzzle 2 |
-| **Total Unique Pins** | **~26** | — | — | **Within capacity!** ✅ |
+| Puzzle 1 (Simon) | 10 pins | 10 pins | 20 | 4 buttons shared with P2 & P5 |
+| Puzzle 2 (World Map) | 4 encoder pins | — | 4 | All 4 shared with P1 & P5 |
+| Puzzle 5 (Missile) | 4 joystick pins | — | 4 | All 4 shared with P1 & P2 |
+| **Props Pi Total** | **16 unique** | — | **20 pins** | **✅ Within capacity** |
+
+**Shared pins (Props Pi):** GPIO 16, 19, 20, 26 used by Puzzles 1, 2, 5 (safe - sequential execution)
+
+### Narrative Pi (Raspberry Pi #2) - GPIO Usage
+
+| Puzzle | Inputs | Outputs | Total Pins | Pin Sharing |
+|---|---|---|---|---|
+| Puzzle 3 (Gadget Code) | 2 keypad pins | 3 LED pins | 5 | None |
+| Puzzle 4 (Vehicle) | 15 (12 lever + 3 button) | — | 15 | None |
+| **Narrative Pi Total** | — | — | **20 pins** | **✅ Within capacity** |
 
 **Key optimization strategies:**
-- **Sequential pin sharing:** Puzzles 1, 2, and 5 share GPIO pins (safe because puzzles run sequentially)
+- **2-Pi distribution:** Props vs Narrative screens, distributes GPIO load evenly
+- **Sequential pin sharing:** Props Pi shares GPIO 16, 19, 20, 26 across Puzzles 1, 2, 5
 - **Wiegand protocol:** Puzzle 3 uses 2 pins instead of 10 for full keypad
 - **Sparse lever wiring:** Puzzle 4 uses 12 pins instead of 40 for all positions
-- **Joystick combination:** Puzzle 5 uses 4 pins for 8 directions
-
-**Shared pin groups:**
-- **GPIO 16, 19, 20, 22**: Puzzle 1 (buttons) ↔ Puzzle 2 (encoders) ↔ Puzzle 5 (joystick)
-- **GPIO 26**: Puzzle 2 (encoder switch) ↔ Puzzle 5 (joystick right)
 
 ## Related Projects
 
