@@ -50,6 +50,29 @@ class PuzzleLogic extends EventEmitter {
     this.emit('stateChange', this.getState());
   }
 
+  setLevers(positions) {
+    // Update all levers from GPIO reading
+    // positions is an array like [2, 7, 4, 5] or may contain nulls for unwired positions
+    if (this.state !== BROWSING) return;
+
+    let changed = false;
+    for (let i = 0; i < positions.length && i < config.leverCount; i++) {
+      const pos = positions[i];
+      if (pos !== null && pos >= 1 && pos <= config.leverPositions) {
+        if (this.levers[i] !== pos) {
+          this.levers[i] = pos;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      console.log(`[puzzle4] Levers updated: [${this.levers.join('-')}]`);
+      this.emit('leversChanged', [...this.levers]);
+      this.emit('stateChange', this.getState());
+    }
+  }
+
   adjustLever(leverIndex, delta) {
     if (this.state !== BROWSING) return;
     if (leverIndex < 0 || leverIndex >= config.leverCount) return;

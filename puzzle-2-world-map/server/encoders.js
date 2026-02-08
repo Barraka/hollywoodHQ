@@ -27,11 +27,14 @@ class Encoders extends EventEmitter {
       return;
     }
 
-    // Encoder X: CLK on GPIO 17, DT on GPIO 27
-    // Encoder Y: CLK on GPIO 22, DT on GPIO 23
-    // Adjust pin numbers to match your wiring
-    this.encoderX = { clk: new Gpio(17, 'in', 'both'), dt: new Gpio(27, 'in') };
-    this.encoderY = { clk: new Gpio(22, 'in', 'both'), dt: new Gpio(23, 'in') };
+    // Encoder pins from config.js
+    // NOTE: These GPIO pins are shared with Puzzle 1 (Simon buttons) and Puzzle 5 (Joystick)
+    // This is safe because puzzles run sequentially
+    const xPins = config.encoderPins.x;
+    const yPins = config.encoderPins.y;
+
+    this.encoderX = { clk: new Gpio(xPins.clk, 'in', 'both'), dt: new Gpio(xPins.dt, 'in') };
+    this.encoderY = { clk: new Gpio(yPins.clk, 'in', 'both'), dt: new Gpio(yPins.dt, 'in') };
 
     this.encoderX.lastClk = this.encoderX.clk.readSync();
     this.encoderY.lastClk = this.encoderY.clk.readSync();
@@ -39,6 +42,7 @@ class Encoders extends EventEmitter {
     this.encoderX.clk.watch((err, value) => {
       if (err || this.destroyed) return;
       const dt = this.encoderX.dt.readSync();
+      // Quadrature decoding: if CLK leads DT, direction is positive (clockwise)
       const direction = value !== dt ? 1 : -1;
       this.emit('turn', 'x', direction);
     });
@@ -50,7 +54,7 @@ class Encoders extends EventEmitter {
       this.emit('turn', 'y', direction);
     });
 
-    console.log('[encoders] GPIO initialized (pins: X=17/27, Y=22/23)');
+    console.log(`[encoders] GPIO initialized (X: CLK=${xPins.clk} DT=${xPins.dt}, Y: CLK=${yPins.clk} DT=${yPins.dt})`);
   }
 
   // --- Mock mode (keyboard input via stdin or WebSocket commands) ---

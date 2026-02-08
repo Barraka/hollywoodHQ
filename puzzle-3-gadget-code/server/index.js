@@ -4,6 +4,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
 const LEDs = require('./leds');
+const Keypad = require('./keypad');
 const PuzzleLogic = require('./puzzleLogic');
 
 // --- Detect mock mode ---
@@ -12,7 +13,19 @@ if (isMock) console.log('[server] Running in MOCK mode');
 
 // --- Initialize modules ---
 const leds = new LEDs(isMock);
+const keypad = new Keypad(isMock);
 const puzzle = new PuzzleLogic(leds);
+
+// --- Wire GPIO keypad events directly to puzzle logic ---
+keypad.on('keypress', (key) => {
+  if (key >= '0' && key <= '9') {
+    puzzle.digitPressed(key);
+  } else if (key === '#') {
+    puzzle.submitCode();
+  } else if (key === '*') {
+    puzzle.clearCode();
+  }
+});
 
 // --- HTTP server (serves frontend + video files) ---
 const MIME_TYPES = {
@@ -219,6 +232,7 @@ httpServer.listen(config.httpPort, () => {
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   leds.destroy();
+  keypad.destroy();
   httpServer.close();
   process.exit(0);
 });

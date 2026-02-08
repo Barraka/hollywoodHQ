@@ -24,6 +24,12 @@ module.exports = {
   // GPIO pins for the 3 LEDs (BCM numbering)
   ledPins: [24, 25, 12],
 
+  // GPIO pins for Wiegand keypad (BCM numbering)
+  keypadPins: {
+    d0: 17, // Wiegand DATA0 (green wire)
+    d1: 27, // Wiegand DATA1 (white wire)
+  },
+
   // Room Controller WebSocket (set to null to disable)
   roomControllerUrl: null,
   propId: 'puzzle-3-gadget-code',

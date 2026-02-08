@@ -3,19 +3,20 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
-const Joystick = require('./joystick');
+const ButtonManager = require('./buttons');
 const PuzzleLogic = require('./puzzleLogic');
 
 const isMock = process.argv.includes('--mock');
 if (isMock) console.log('[server] Running in MOCK mode');
 
-const joystick = new Joystick(isMock);
-const puzzle = new PuzzleLogic(joystick);
+const buttonManager = new ButtonManager(isMock);
+const puzzle = new PuzzleLogic(buttonManager);
 
 // --- HTTP server ---
 const MIME_TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
 };
 
 const publicDir = path.join(__dirname, '..', 'public');
@@ -50,7 +51,7 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log('[ws] Client connected (' + clients.size + ' total)');
 
-  ws.send(JSON.stringify({ type: 'config', mock: isMock }));
+  ws.send(JSON.stringify({ type: 'config', mock: isMock, buttons: config.buttons }));
   ws.send(JSON.stringify({ type: 'state', ...puzzle.getState() }));
 
   ws.on('message', (raw) => {
@@ -58,12 +59,8 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
-      case 'direction':
-        if (isMock) joystick.simulateDirection(msg.direction);
-        break;
-
-      case 'forwardAnimDone':
-        puzzle.forwardAnimDone();
+      case 'buttonPress':
+        if (isMock) buttonManager.simulatePress(msg.buttonId);
         break;
 
       case 'ready':
@@ -94,28 +91,25 @@ wss.on('connection', (ws) => {
 });
 
 // --- Wire puzzle events ---
-puzzle.on('forwardAnimation', (path, directions, duration) => {
-  broadcast({ type: 'forwardAnimation', path, directions, duration });
+puzzle.on('correctPress', (buttonId) => {
+  broadcast({ type: 'correctPress', buttonId });
 });
 
-puzzle.on('correctInput', (dir, fromIndex, toIndex, duration) => {
-  broadcast({ type: 'correctInput', dir, fromIndex, toIndex, duration });
+puzzle.on('wrongPress', (buttonId) => {
+  broadcast({ type: 'wrongPress', buttonId });
 });
 
-puzzle.on('wrongInput', (dir, expected) => {
-  broadcast({ type: 'wrongInput', dir, expected });
+puzzle.on('buttonBlink', (buttonId, isLit) => {
+  broadcast({ type: 'buttonBlink', buttonId, isLit });
 });
 
 puzzle.on('stateChange', (state) => {
   broadcast({ type: 'state', ...state });
 });
 
-puzzle.on('timerUpdate', (timeRemaining) => {
-  broadcast({ type: 'timerUpdate', timeRemaining });
-});
-
-puzzle.on('timeout', () => {
-  broadcast({ type: 'timeout' });
+// Mock LED changes
+buttonManager.on('ledChange', (buttonId, state) => {
+  broadcast({ type: 'ledChange', buttonId, state });
 });
 
 // --- Mock mode ---
@@ -126,13 +120,12 @@ if (isMock) {
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
   console.log('[server] http://localhost:' + config.httpPort);
-  console.log('[puzzle5] Path:', config.path.map(c => c.name).join(' → '));
-  console.log('[puzzle5] Directions:', config.directions.join(', '));
+  console.log('[puzzle1] Buttons:', config.buttons.length);
 });
 
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
-  joystick.destroy();
+  buttonManager.destroy();
   httpServer.close();
   process.exit(0);
 });

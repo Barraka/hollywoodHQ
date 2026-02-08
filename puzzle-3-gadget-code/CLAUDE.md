@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Puzzle 3 of the "Mission: Hollywood" escape room. A virtual assistant (AI video) presents 3 situations. For each, players identify the correct spy gadget from a physical display and type its 4-digit code on a USB numpad. Correct codes light physical LEDs. All 3 lit = puzzle solved.
+Puzzle 3 of the "Mission: Hollywood" escape room. A virtual assistant (AI video) presents 3 situations. For each, players identify the correct spy gadget from a physical display and type its 4-digit code on a Wiegand GPIO keypad. Correct codes light physical LEDs. All 3 lit = puzzle solved.
 
 ## Commands
 
@@ -30,26 +30,36 @@ Dev mode serves at http://localhost:3001. Type digits 0-9 + Enter to submit code
 server/index.js        → Entry point: HTTP/WebSocket server, routes messages, auto-activate in mock mode
 server/puzzleLogic.js  → State machine: INACTIVE → INTRO → SITUATION 1/2/3 → SOLVED
 server/leds.js         → GPIO LED control via onoff, mock fallback logs to console
-config.js              → Situations (video + code), video filenames, LED pins, port
+server/keypad.js       → Wiegand GPIO keypad reader, emits 'keypress' events
+config.js              → Situations (video + code), video filenames, LED/keypad pins, port
 public/index.html      → Fullscreen video player with HUD overlay (situation dots, code dots, scanlines)
-public/app.js          → WebSocket client, video playback, keyboard input, HUD updates
+public/app.js          → WebSocket client, video playback, keyboard input (mock mode), HUD updates
 public/videos/         → Video clips (placeholder .mp4 files for dev, replace with AI-generated later)
 generate-placeholders.js → Utility: generates simple placeholder video clips via ffmpeg
 ```
 
 ## Data Flow
 
+**Production (GPIO Keypad):**
 ```
-Numpad keypress (browser keydown)
+Wiegand keypad press → GPIO pins D0/D1 pulse
       │
       ▼
-  WebSocket → server/puzzleLogic.js checks code
+  server/keypad.js decodes → emits 'keypress' event
+      │
+      ▼
+  server/puzzleLogic.js checks code
       │
       ├─ correct → GPIO LED on, play correct.mp4, then next situation
       └─ wrong → play wrong.mp4, return to idle
       │
       ▼
   WebSocket → browser plays video clip
+```
+
+**Mock Mode (Browser Keyboard):**
+```
+Browser keydown → WebSocket → server/puzzleLogic.js → (same as above)
 ```
 
 ## State Machine
@@ -62,16 +72,31 @@ Wrong codes play a rejection clip and return to the current situation.
 
 - **Video-first UI**: the browser is essentially a fullscreen video player with a minimal HUD overlay.
 - **Idle loop**: between clips, `idle.mp4` loops seamlessly to keep the screen alive.
-- **Input via browser keyboard events**: USB numpad appears as a keyboard, browser captures keydown events and sends digits to server via WebSocket. Server validates.
+- **Input via GPIO or browser keyboard**: Production uses Wiegand GPIO keypad. Mock mode uses browser keyboard events sent via WebSocket.
 - **Mock mode** (`--mock`): auto-activates puzzle on first client connection for easy testing.
 - **Situation clips vs feedback clips**: situation clips trigger `situationClipEnded` (distinct from `clipEnded` for correct/wrong/solved/intro) so the state machine knows when to transition to input-waiting state.
 
 ## GPIO Pin Mapping (Raspberry Pi)
 
 Defined in `config.js`:
+
+**LEDs:**
 - LED 1 (Situation 1): GPIO 24
 - LED 2 (Situation 2): GPIO 25
 - LED 3 (Situation 3): GPIO 12
+
+**Wiegand Keypad:**
+- DATA0 (D0): GPIO 17 (green wire)
+- DATA1 (D1): GPIO 27 (white wire)
+- Power: 12V DC (red/black wires - not connected to Pi)
+
+**Wiring Notes:**
+- Keypad requires external 12V power supply
+- Only D0 and D1 data lines connect to Raspberry Pi GPIO
+- Common ground between keypad and Pi recommended
+- # key = Submit code
+- * key = Clear code
+- 0-9 = Digit entry
 
 ## Placeholder Videos
 

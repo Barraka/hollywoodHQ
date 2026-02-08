@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Puzzle 1 — Simon</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #000;
+      color: #0df;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Grid background */
+    .bg-grid {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-image:
+        linear-gradient(rgba(0, 220, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 220, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 0;
+    }
+
+    /* Scanlines effect */
+    #scanlines {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Vignette */
+    #vignette {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.7) 100%);
+      pointer-events: none;
+      z-index: 998;
+    }
+
+    /* HUD */
+    #hud {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #title {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      font-weight: bold;
+      color: rgba(0, 220, 255, 0.9);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px rgba(0, 220, 255, 0.6);
+    }
+
+    #progress {
+      position: absolute;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      color: rgba(0, 220, 255, 0.7);
+      letter-spacing: 2px;
+    }
+
+    #status-text {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(0, 220, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    /* Button grid */
+    #button-grid {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 30px;
+      padding: 40px;
+    }
+
+    .button {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 4px solid;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    .button::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      height: 60%;
+      border-radius: 50%;
+      background: inherit;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .button.lit::before {
+      opacity: 1;
+      box-shadow: 0 0 40px currentColor;
+    }
+
+    .button.locked {
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .button.red {
+      border-color: #f33;
+      background-color: rgba(255, 51, 51, 0.2);
+      color: #f33;
+    }
+
+    .button.blue {
+      border-color: #3af;
+      background-color: rgba(51, 170, 255, 0.2);
+      color: #3af;
+    }
+
+    .button.green {
+      border-color: #3f3;
+      background-color: rgba(51, 255, 51, 0.2);
+      color: #3f3;
+    }
+
+    .button.yellow {
+      border-color: #ff3;
+      background-color: rgba(255, 255, 51, 0.2);
+      color: #ff3;
+    }
+
+    .button.lit.red { background-color: rgba(255, 51, 51, 0.8); }
+    .button.lit.blue { background-color: rgba(51, 170, 255, 0.8); }
+    .button.lit.green { background-color: rgba(51, 255, 51, 0.8); }
+    .button.lit.yellow { background-color: rgba(255, 255, 51, 0.8); }
+
+    .button.locked {
+      background-color: currentColor !important;
+      opacity: 0.9;
+    }
+
+    .button-number {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 36px;
+      font-weight: bold;
+      text-shadow: 0 0 10px currentColor;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    /* Wrong flash effect */
+    .wrong-flash {
+      animation: wrongFlash 0.3s ease-out;
+    }
+
+    @keyframes wrongFlash {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
+    #feedback-flash {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* Solved overlay */
+    #solved-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #solved-overlay.visible {
+      opacity: 1;
+    }
+
+    #solved-overlay .solved-text {
+      font-size: 48px;
+      color: #0f6;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      text-shadow: 0 0 30px rgba(0, 255, 100, 0.6);
+      animation: solvedAppear 0.8s ease-out;
+    }
+
+    @keyframes solvedAppear {
+      0% { opacity: 0; transform: scale(0.8); }
+      50% { transform: scale(1.1); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Mock controls */
+    #mock-controls {
+      position: absolute;
+      bottom: 80px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid rgba(0,220,255,0.3);
+      padding: 12px;
+      font-size: 11px;
+      color: rgba(0,220,255,0.6);
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #mock-controls.visible { opacity: 1; }
+
+    /* Start overlay */
+    #start-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .start-text {
+      font-size: 36px;
+      color: #0df;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+
+    .start-sub {
+      margin-top: 20px;
+      font-size: 14px;
+      color: rgba(0,220,255,0.6);
+      letter-spacing: 2px;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { text-shadow: 0 0 20px rgba(0,220,255,0.5); }
+      50% { text-shadow: 0 0 40px rgba(0,220,255,1); }
+    }
+
+    #debug-state {
+      position: absolute;
+      top: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: rgba(0,220,255,0.4);
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="bg-grid"></div>
+
+    <div id="feedback-flash"></div>
+
+    <div id="hud">
+      <div id="title">QG Réactivation</div>
+      <div id="progress">0 / 10</div>
+      <div id="debug-state"></div>
+      <div id="status-text"></div>
+    </div>
+
+    <div id="button-grid">
+      <!-- Buttons will be generated by JavaScript -->
+    </div>
+
+    <div id="solved-overlay">
+      <div class="solved-text">QG RÉACTIVÉ</div>
+    </div>
+
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+
+    <div id="mock-controls">
+      <div><strong>CONTRÔLES DEV</strong></div>
+      <div>Cliquez sur les boutons pour simuler</div>
+      <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
+      <div>X = Activer | C = Réinitialiser | V = Forcer résolution</div>
+    </div>
+
+    <div id="start-overlay">
+      <div class="start-text">Cliquez pour commencer</div>
+      <div class="start-sub">ou appuyez sur une touche</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

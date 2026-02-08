@@ -96,23 +96,148 @@
       text-anchor: middle;
     }
 
-    /* Missile marker */
+    /* Missile marker (position group) */
     #missile-marker {
-      fill: #ff3333;
       filter: drop-shadow(0 0 8px rgba(255, 50, 50, 0.9));
-      transition: cx 0.8s ease-in-out, cy 0.8s ease-in-out;
     }
 
-    /* Missile pulse ring */
-    #missile-pulse {
-      fill: none;
-      stroke: rgba(255, 50, 50, 0.5);
-      stroke-width: 1;
+    /* Missile rotation group (rotates faster than position) */
+    #missile-rotation {
+      transition: transform 0.2s ease-out;
     }
 
-    @keyframes missilePulse {
-      0% { r: 4; opacity: 1; }
-      100% { r: 15; opacity: 0; }
+    /* Missile exhaust pulsing effect */
+    .missile-exhaust {
+      animation: exhaustPulse 0.6s ease-in-out infinite;
+    }
+
+    @keyframes exhaustPulse {
+      0%, 100% {
+        r: 2.5;
+        opacity: 0.4;
+      }
+      50% {
+        r: 4;
+        opacity: 0.8;
+      }
+    }
+
+    /* Explosion animations */
+    .explosion-core {
+      animation: explosionCore 0.4s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
+
+    @keyframes explosionCore {
+      0% {
+        r: 2;
+        opacity: 1;
+        fill: #ffffff;
+      }
+      30% {
+        r: 25;
+        opacity: 1;
+        fill: #ffee88;
+      }
+      100% {
+        r: 50;
+        opacity: 0;
+        fill: #ff6600;
+      }
+    }
+
+    .explosion-shockwave {
+      animation: shockwave 1.2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
+
+    @keyframes shockwave {
+      0% {
+        r: 5;
+        opacity: 0.9;
+        stroke-width: 4;
+      }
+      50% {
+        opacity: 0.6;
+        stroke-width: 3;
+      }
+      100% {
+        r: 100;
+        opacity: 0;
+        stroke-width: 0.5;
+      }
+    }
+
+    .explosion-fireball {
+      animation: fireball 0.8s ease-out forwards;
+    }
+
+    @keyframes fireball {
+      0% {
+        opacity: 1;
+        r: 5;
+      }
+      100% {
+        opacity: 0;
+        r: 35;
+      }
+    }
+
+    .explosion-debris {
+      animation: debris 1s ease-out forwards;
+    }
+
+    @keyframes debris {
+      0% {
+        opacity: 1;
+        stroke-width: 3;
+      }
+      100% {
+        opacity: 0;
+        stroke-width: 0.5;
+      }
+    }
+
+    .explosion-smoke {
+      animation: smoke 1.5s ease-out forwards;
+    }
+
+    @keyframes smoke {
+      0% {
+        opacity: 0.8;
+        r: 10;
+      }
+      100% {
+        opacity: 0;
+        r: 60;
+      }
+    }
+
+    .missile-explode {
+      animation: missileExplode 0.3s ease-out forwards;
+    }
+
+    @keyframes missileExplode {
+      0% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(2) rotate(20deg);
+      }
+    }
+
+    /* Screen flash effect */
+    .screen-flash {
+      animation: screenFlash 0.5s ease-out forwards;
+    }
+
+    @keyframes screenFlash {
+      0% {
+        opacity: 0.6;
+      }
+      100% {
+        opacity: 0;
+      }
     }
 
     /* HUD overlays */
@@ -157,6 +282,54 @@
       color: rgba(0, 220, 255, 0.6);
       letter-spacing: 3px;
       text-transform: uppercase;
+    }
+
+    #timer-display {
+      position: absolute;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 40px;
+      font-weight: bold;
+      color: rgba(0, 220, 255, 1);
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(0, 220, 255, 0.6);
+      padding: 12px 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(0, 220, 255, 0.3);
+      text-shadow: 0 0 10px rgba(0, 220, 255, 0.5);
+      transition: all 0.3s ease;
+      opacity: 0;
+      letter-spacing: 4px;
+      font-family: 'Courier New', monospace;
+    }
+
+    #timer-display.visible {
+      opacity: 1;
+    }
+
+    #timer-display.warning {
+      color: rgba(255, 150, 0, 1);
+      border-color: rgba(255, 150, 0, 0.8);
+      box-shadow: 0 0 25px rgba(255, 150, 0, 0.5);
+      text-shadow: 0 0 15px rgba(255, 150, 0, 0.7);
+    }
+
+    #timer-display.critical {
+      color: rgba(255, 50, 50, 1);
+      border-color: rgba(255, 50, 50, 1);
+      box-shadow: 0 0 30px rgba(255, 50, 50, 0.8);
+      text-shadow: 0 0 20px rgba(255, 50, 50, 0.9);
+      animation: timerPulse 0.5s ease-in-out infinite;
+    }
+
+    @keyframes timerPulse {
+      0%, 100% {
+        transform: translateX(-50%) scale(1);
+      }
+      50% {
+        transform: translateX(-50%) scale(1.05);
+      }
     }
 
     #status-text {
@@ -209,6 +382,68 @@
       text-transform: uppercase;
       letter-spacing: 8px;
       text-shadow: 0 0 30px rgba(0, 255, 100, 0.6);
+      animation: solvedAppear 0.8s ease-out;
+    }
+
+    @keyframes solvedAppear {
+      0% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Timeout popup */
+    #timeout-popup {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #timeout-popup.visible {
+      opacity: 1;
+    }
+
+    #timeout-popup .timeout-text {
+      font-size: 36px;
+      color: #f33;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(255, 50, 50, 0.8);
+      background: rgba(0, 0, 0, 0.8);
+      border: 3px solid rgba(255, 50, 50, 0.8);
+      padding: 30px 50px;
+      border-radius: 10px;
+      box-shadow: 0 0 40px rgba(255, 50, 50, 0.6);
+      animation: timeoutAppear 0.4s ease-out;
+    }
+
+    @keyframes timeoutAppear {
+      0% {
+        opacity: 0;
+        transform: scale(0.7) rotate(-5deg);
+      }
+      60% {
+        transform: scale(1.05) rotate(2deg);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
     }
 
     /* Background effects */
@@ -315,28 +550,34 @@
   <div id="hud">
     <div id="progress-bar"></div>
     <div id="direction-hint"></div>
+    <div id="timer-display"></div>
     <div id="status-text"></div>
   </div>
 
   <div id="solved-overlay">
-    <div class="solved-text">Missile neutralized</div>
+    <div class="solved-text">Missile neutralisé</div>
+  </div>
+
+  <div id="timeout-popup">
+    <div class="timeout-text">Trop lent, il faut être plus rapide!!</div>
   </div>
 
   <div id="scanlines"></div>
   <div id="vignette"></div>
 
   <div id="mock-controls">
-    <div><strong>DEV CONTROLS</strong></div>
-    <div>Arrow keys: joystick</div>
+    <div><strong>CONTRÔLES DEV</strong></div>
+    <div>Pavé numérique 8-directions (7 8 9 / 4 6 / 1 2 3)</div>
+    <div>ou Flèches pour N/S/E/W</div>
     <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
-    <div>X = Activate | C = Reset | V = Force Solve</div>
+    <div>X = Activer | C = Réinitialiser | V = Forcer résolution</div>
   </div>
 
   <div id="debug-state"></div>
 
   <div id="start-overlay">
-    <div class="start-text">Click to start</div>
-    <div class="start-sub">or press any key</div>
+    <div class="start-text">Cliquez pour commencer</div>
+    <div class="start-sub">ou appuyez sur une touche</div>
   </div>
 
   <script src="app.js"></script>

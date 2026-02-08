@@ -29,6 +29,14 @@ module.exports = {
   beepFrequencyHz: 800,
   beepDurationMs: 60,
 
+  // GPIO pins for rotary encoders (BCM numbering)
+  // NOTE: These pins are shared with Puzzle 1 (Simon) and Puzzle 5 (Missile)
+  // This is safe because puzzles run sequentially
+  encoderPins: {
+    x: { clk: 16, dt: 20 },  // X encoder (horizontal crosshair)
+    y: { clk: 19, dt: 26 },  // Y encoder (vertical crosshair)
+  },
+
   // Room Controller WebSocket (set to null to disable)
   roomControllerUrl: null, // e.g. 'ws://localhost:3001'
   propId: 'puzzle-2-world-map',

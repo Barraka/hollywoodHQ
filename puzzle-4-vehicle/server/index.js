@@ -4,6 +4,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
 const Buttons = require('./buttons');
+const Levers = require('./levers');
 const PuzzleLogic = require('./puzzleLogic');
 
 // --- Detect mock mode ---
@@ -12,11 +13,21 @@ if (isMock) console.log('[server] Running in MOCK mode');
 
 // --- Initialize modules ---
 const buttons = new Buttons(isMock);
+const levers = new Levers(isMock);
 const puzzle = new PuzzleLogic();
 
 // Wire buttons to puzzle
 buttons.on('navigate', (dir) => puzzle.navigate(dir));
 buttons.on('validate', () => puzzle.validate());
+
+// Wire levers to puzzle
+levers.on('leversChanged', (positions) => {
+  puzzle.setLevers(positions);
+});
+
+// Initialize levers GPIO
+const leverConfig = config.leverPins.map(posMap => ({ positions: posMap }));
+levers.init(leverConfig);
 
 // --- HTTP server ---
 const MIME_TYPES = {
@@ -109,7 +120,14 @@ wss.on('connection', (ws) => {
         break;
 
       case 'leverAdjust':
-        if (isMock) puzzle.adjustLever(msg.lever, msg.delta);
+        // Mock mode: simulate lever position change
+        if (isMock) {
+          const currentPositions = levers.getPositions();
+          const newPos = (currentPositions[msg.lever] || 1) + msg.delta;
+          // Clamp to 1-10
+          const clampedPos = Math.max(1, Math.min(10, newPos));
+          levers.setMockPosition(msg.lever, clampedPos);
+        }
         break;
 
       case 'ready':
@@ -179,6 +197,7 @@ httpServer.listen(config.httpPort, () => {
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   buttons.destroy();
+  levers.destroy();
   httpServer.close();
   process.exit(0);
 });

@@ -1,0 +1,19 @@
+{
+  "name": "puzzle-1-simon",
+  "version": "1.0.0",
+  "description": "Mission: Hollywood - Puzzle 1 (Simon Game)",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js --mock"
+  },
+  "keywords": ["escape-room", "puzzle", "simon"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "onoff": "^6.0.3"
+  }
+}

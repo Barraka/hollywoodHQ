@@ -7,8 +7,13 @@ const REVERSING = 'reversing';
 const ANIMATE_LEG = 'animate_leg';
 const SOLVED = 'solved';
 
-// Opposite directions
-const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
+// Opposite directions (8-way)
+const OPPOSITE = {
+  n: 's', s: 'n',
+  e: 'w', w: 'e',
+  ne: 'sw', sw: 'ne',
+  se: 'nw', nw: 'se',
+};
 
 class PuzzleLogic extends EventEmitter {
   constructor(joystick) {
@@ -23,6 +28,10 @@ class PuzzleLogic extends EventEmitter {
 
     // Current missile position index in path (during reverse, starts at last city)
     this.missileAt = config.path.length - 1;
+
+    // Timer for input timeout
+    this.timerId = null;
+    this.timeRemaining = 0;
 
     // Wire joystick
     this.joystick.on('direction', (dir) => this._onDirection(dir));
@@ -45,7 +54,47 @@ class PuzzleLogic extends EventEmitter {
     this.state = REVERSING;
     this.missileAt = config.path.length - 1;
     this.reverseLeg = 0;
+    this._startTimer();
     this.emit('stateChange', this.getState());
+  }
+
+  _startTimer() {
+    this._stopTimer();
+    this.timeRemaining = config.inputTimeLimit * 1000; // Convert to milliseconds
+    this.emit('timerUpdate', this.timeRemaining);
+
+    this.timerId = setInterval(() => {
+      this.timeRemaining -= 100; // Decrease by 100ms
+      this.emit('timerUpdate', this.timeRemaining);
+
+      if (this.timeRemaining <= 0) {
+        this._onTimeout();
+      }
+    }, 100); // Update every 100ms for smooth countdown
+  }
+
+  _stopTimer() {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    this.timeRemaining = 0;
+  }
+
+  _onTimeout() {
+    console.log('[puzzle5] Timer expired — resetting to beginning of reversal');
+    this._stopTimer();
+
+    // Reset to beginning of reversal phase (keep forward animation done)
+    this.state = REVERSING;
+    this.missileAt = config.path.length - 1;
+    this.reverseLeg = 0;
+
+    this.emit('timeout');
+    this.emit('stateChange', this.getState());
+
+    // Restart timer
+    this._startTimer();
   }
 
   _onDirection(dir) {
@@ -60,7 +109,8 @@ class PuzzleLogic extends EventEmitter {
     console.log(`[puzzle5] Input: ${dir} | Expected: ${expectedDir} (reverse of ${forwardDir})`);
 
     if (dir === expectedDir) {
-      // Correct! Animate missile one leg back
+      // Correct! Stop timer and animate missile one leg back
+      this._stopTimer();
       this.state = ANIMATE_LEG;
       const fromCity = this.missileAt;
       this.missileAt--;
@@ -80,17 +130,31 @@ class PuzzleLogic extends EventEmitter {
         } else {
           this.state = REVERSING;
           this.emit('stateChange', this.getState());
+          // Restart timer for next input
+          this._startTimer();
         }
       }, config.legAnimDuration * 1000 + 200);
     } else {
-      // Wrong direction
+      // Wrong direction - reset to beginning
+      console.log('[puzzle5] Wrong input — resetting to beginning of reversal');
+      this._stopTimer();
       this.emit('wrongInput', dir, expectedDir);
+
+      // Reset after brief feedback delay
+      setTimeout(() => {
+        this.state = REVERSING;
+        this.missileAt = config.path.length - 1;
+        this.reverseLeg = 0;
+        this.emit('stateChange', this.getState());
+        this._startTimer();
+      }, 800);
     }
   }
 
   forceSolve() {
     if (this.state === SOLVED) return;
     console.log('[puzzle5] Force-solved by GM');
+    this._stopTimer();
     this.missileAt = 0;
     this.reverseLeg = this.totalLegs;
     this.state = SOLVED;
@@ -99,6 +163,7 @@ class PuzzleLogic extends EventEmitter {
 
   reset() {
     console.log('[puzzle5] Resetting');
+    this._stopTimer();
     this.state = INACTIVE;
     this.reverseLeg = 0;
     this.missileAt = config.path.length - 1;
@@ -114,6 +179,7 @@ class PuzzleLogic extends EventEmitter {
       totalCities: config.path.length,
       path: config.path,
       directions: config.directions,
+      timeRemaining: this.timeRemaining,
     };
   }
 }

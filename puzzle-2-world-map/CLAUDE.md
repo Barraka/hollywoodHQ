@@ -48,9 +48,13 @@ Frontend → server messages: `{type: 'key', axis, direction}` (mock input), `{t
 
 ## GPIO Pin Mapping (Raspberry Pi)
 
-Defined in `server/encoders.js`:
-- Encoder X: CLK = GPIO 17, DT = GPIO 27
-- Encoder Y: CLK = GPIO 22, DT = GPIO 23
+Defined in `config.js`:
+- Encoder X: CLK = GPIO 16, DT = GPIO 20 (shared with Puzzle 1 & 5)
+- Encoder Y: CLK = GPIO 19, DT = GPIO 26 (shared with Puzzle 1 & 5)
+
+**Pin Sharing Note:** These GPIO pins are safely reused from Puzzle 1 (Simon buttons) and Puzzle 5 (Joystick) since puzzles run sequentially, not simultaneously.
+
+**Hardware:** 2× KY-040 rotary encoders
 
 ## Not Yet Implemented
 

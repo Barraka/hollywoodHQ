@@ -5,14 +5,17 @@ let puzzleState = {};
 let audioUnlocked = false;
 let svgEl = null;
 let missileGroup = null;
+let currentMissileAngle = 0; // Track current missile rotation
 
 // DOM
 const mapContainer = document.getElementById('map-container');
 const progressBar = document.getElementById('progress-bar');
 const directionHint = document.getElementById('direction-hint');
+const timerDisplay = document.getElementById('timer-display');
 const statusText = document.getElementById('status-text');
 const feedbackFlash = document.getElementById('feedback-flash');
 const solvedOverlay = document.getElementById('solved-overlay');
+const timeoutPopup = document.getElementById('timeout-popup');
 const mockControls = document.getElementById('mock-controls');
 const debugState = document.getElementById('debug-state');
 const startOverlay = document.getElementById('start-overlay');
@@ -29,14 +32,41 @@ fetch('world-map.svg')
 
 function addCityDots() {
   if (!svgEl) return;
+  // City dots for visual reference on the world map
+  // These represent major cities globally (not just the missile path)
   const dots = [
-    [130.6,405.6],[133,422.4],[218.3,412.3],[232.3,429.7],[170.6,476.5],
-    [405.4,402.7],[406.4,386.8],[246.8,389.2],[760.4,629.3],[706.4,630.3],
-    [255.9,653.4],[303.7,562.8],[367.3,485.6],[496.1,357.8],[724.7,404.6],
-    [239.1,625],[106,309.6],[367.3,345.3],[591.6,328.9],[675,410.4],
-    [585.3,449.9],[500,459.1],[499.5,410.4],[454.6,613.9],[479.7,580.1],
-    [516.4,520.8],[446.9,392.5],[427.6,394],[402.6,425.3],[389,431.6],
-    [216.9,549.8],
+    // Americas
+    [130.6,405.6],  // Los Angeles
+    [218.3,389.2],  // New York
+    [170.6,446.0],  // Mexico City
+    [232.3,530.0],  // Lima
+    [303.7,562.8],  // Rio de Janeiro
+    [255.9,653.4],  // Southern South America
+    // Africa
+    [479.7,630.0],  // Cape Town
+    [479.7,580.1],  // Johannesburg
+    [516.4,520.8],  // Nairobi
+    [367.3,470.0],  // Dakar
+    [389.0,431.6],  // Casablanca
+    [454.6,450.0],  // Cairo
+    [500.0,485.6],  // East Africa
+    // Europe
+    [402.6,425.3],  // Madrid
+    [405.4,402.7],  // Paris
+    [427.6,394.0],  // Berlin
+    [446.9,392.5],  // Warsaw
+    [496.1,357.8],  // Moscow
+    // Asia
+    [585.3,449.9],  // Mumbai
+    [675.0,410.4],  // Beijing
+    [706.4,435.0],  // Shanghai
+    [675.0,500.0],  // Singapore
+    [706.4,530.0],  // Jakarta
+    [724.7,404.6],  // Tokyo
+    // Oceania
+    [785.0,590.0],  // Noumea
+    [760.4,629.3],  // Sydney
+    [706.4,630.3],  // Other Pacific
   ];
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.id = 'city-dots';
@@ -60,6 +90,9 @@ function drawTrajectory(path, directions, missileAt, reverseLeg) {
 
   missileGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   missileGroup.id = 'missile-layer';
+
+  // Store directions for later use
+  missileGroup.directions = directions;
 
   const totalLegs = directions.length;
   const reversedLegs = reverseLeg || 0;
@@ -107,15 +140,160 @@ function drawTrajectory(path, directions, missileAt, reverseLeg) {
     missileGroup.appendChild(label);
   }
 
-  // Missile marker (pulsing dot at current position)
-  const missile = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  missile.id = 'missile-marker';
-  missile.setAttribute('cx', path[missileAt].x);
-  missile.setAttribute('cy', path[missileAt].y);
-  missile.setAttribute('r', '6');
+  // Missile marker (SVG graphic at current position)
+  // Calculate initial angle based on actual trajectory line
+  // But preserve the current angle if we're actively reversing (to avoid instant rotations)
+  let initialAngle = currentMissileAngle; // Default: keep current angle
+
+  // Only recalculate angle if:
+  // - This is the first draw (currentMissileAngle is 0)
+  // - We're at the start or end position (not mid-reversal)
+  const isFirstDraw = currentMissileAngle === 0;
+  const isAtStart = missileAt === 0;
+  const isAtEnd = missileAt === path.length - 1;
+
+  if (isFirstDraw || isAtStart || isAtEnd) {
+    if (missileAt < path.length - 1) {
+      // If moving forward, point toward next city
+      initialAngle = calculateAngleBetweenPoints(
+        path[missileAt].x, path[missileAt].y,
+        path[missileAt + 1].x, path[missileAt + 1].y
+      );
+    } else if (missileAt > 0) {
+      // If at the end, point back toward previous city
+      initialAngle = calculateAngleBetweenPoints(
+        path[missileAt].x, path[missileAt].y,
+        path[missileAt - 1].x, path[missileAt - 1].y
+      );
+    }
+    currentMissileAngle = initialAngle;
+  }
+
+  const missile = createMissileGraphic(path[missileAt].x, path[missileAt].y, currentMissileAngle);
   missileGroup.appendChild(missile);
 
   svgEl.appendChild(missileGroup);
+}
+
+// --- Create missile SVG graphic ---
+function createMissileGraphic(x, y, angle) {
+  // Position group (handles translation)
+  const positionGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  positionGroup.id = 'missile-marker';
+  positionGroup.setAttribute('transform', `translate(${x}, ${y})`);
+
+  // Rotation group (handles rotation separately for faster animation)
+  const rotationGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  rotationGroup.id = 'missile-rotation';
+  rotationGroup.setAttribute('transform', `rotate(${angle})`);
+
+  // Missile body (pointing right by default)
+  const body = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  body.setAttribute('x', '-8');
+  body.setAttribute('y', '-3');
+  body.setAttribute('width', '16');
+  body.setAttribute('height', '6');
+  body.setAttribute('fill', '#ff3333');
+  body.setAttribute('rx', '1');
+
+  // Nose cone (triangle pointing right)
+  const nose = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  nose.setAttribute('d', 'M 8,-3 L 15,0 L 8,3 Z');
+  nose.setAttribute('fill', '#ff6666');
+
+  // Fins (back stabilizers)
+  const finTop = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  finTop.setAttribute('d', 'M -8,-3 L -8,-6 L -5,-3 Z');
+  finTop.setAttribute('fill', '#cc0000');
+
+  const finBottom = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  finBottom.setAttribute('d', 'M -8,3 L -8,6 L -5,3 Z');
+  finBottom.setAttribute('fill', '#cc0000');
+
+  // Exhaust glow (pulsing)
+  const exhaust = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  exhaust.setAttribute('cx', '-10');
+  exhaust.setAttribute('cy', '0');
+  exhaust.setAttribute('r', '3');
+  exhaust.setAttribute('fill', 'rgba(255, 150, 50, 0.6)');
+  exhaust.setAttribute('class', 'missile-exhaust');
+
+  // Stripe detail
+  const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  stripe.setAttribute('x', '-2');
+  stripe.setAttribute('y', '-3');
+  stripe.setAttribute('width', '2');
+  stripe.setAttribute('height', '6');
+  stripe.setAttribute('fill', 'rgba(255, 255, 255, 0.2)');
+
+  rotationGroup.appendChild(exhaust);
+  rotationGroup.appendChild(body);
+  rotationGroup.appendChild(nose);
+  rotationGroup.appendChild(stripe);
+  rotationGroup.appendChild(finTop);
+  rotationGroup.appendChild(finBottom);
+
+  positionGroup.appendChild(rotationGroup);
+
+  return positionGroup;
+}
+
+// --- Calculate actual angle between two points ---
+function calculateAngleBetweenPoints(x1, y1, x2, y2) {
+  // Calculate angle in radians, then convert to degrees
+  // atan2 returns angle from -PI to PI, with 0 being right (positive x-axis)
+  const radians = Math.atan2(y2 - y1, x2 - x1);
+  const degrees = radians * (180 / Math.PI);
+  return degrees;
+}
+
+// --- Get rotation angle for direction (fallback) ---
+function getAngleForDirection(direction) {
+  const angles = {
+    'right': 0,
+    'down': 90,
+    'left': 180,
+    'up': 270
+  };
+  return angles[direction] || 0;
+}
+
+// --- Update missile position and rotation ---
+function updateMissileTransform(missile, x, y, targetAngle, duration = 0) {
+  if (!missile) return;
+
+  // Get the rotation group (nested inside position group)
+  const rotationGroup = missile.querySelector('#missile-rotation');
+  if (!rotationGroup) return;
+
+  // Calculate shortest rotation path
+  let angleDiff = targetAngle - currentMissileAngle;
+
+  // Normalize to shortest path (-180 to 180)
+  while (angleDiff > 180) angleDiff -= 360;
+  while (angleDiff < -180) angleDiff += 360;
+
+  // Update current angle by the shortest path
+  currentMissileAngle += angleDiff;
+
+  // Animate position (full duration)
+  const posTransform = `translate(${x}, ${y})`;
+  if (duration > 0) {
+    missile.style.transition = `transform ${duration}s ease-in-out`;
+  } else {
+    missile.style.transition = 'none';
+  }
+  missile.setAttribute('transform', posTransform);
+
+  // Animate rotation (1/4 duration - faster rotation at start of movement)
+  const rotTransform = `rotate(${currentMissileAngle})`;
+  const rotDuration = duration > 0 ? duration / 4 : 0;
+  if (rotDuration > 0) {
+    rotationGroup.style.transition = `transform ${rotDuration}s ease-out`;
+  } else {
+    rotationGroup.style.transition = 'none';
+  }
+  rotationGroup.setAttribute('transform', rotTransform);
 }
 
 // --- Animate missile forward ---
@@ -145,11 +323,13 @@ function animateForward(path, directions, duration) {
     }
 
     const target = path[currentLeg + 1];
-    missile.style.transition = `cx ${legDuration}s linear, cy ${legDuration}s linear`;
-    // SVG attributes need to be set for transition (CSS transitions on SVG attributes)
-    // Use SMIL animation instead
-    missile.setAttribute('cx', target.x);
-    missile.setAttribute('cy', target.y);
+    // Calculate actual angle from current position to target
+    const angle = calculateAngleBetweenPoints(
+      path[currentLeg].x, path[currentLeg].y,
+      target.x, target.y
+    );
+
+    updateMissileTransform(missile, target.x, target.y, angle, legDuration);
 
     // Also update the line to "active" as missile passes
     const lines = missileGroup.querySelectorAll('.trajectory-line');
@@ -161,21 +341,29 @@ function animateForward(path, directions, duration) {
     setTimeout(animateNextLeg, legDuration * 1000);
   }
 
-  // Start from first city
-  missile.setAttribute('cx', path[0].x);
-  missile.setAttribute('cy', path[0].y);
+  // Start from first city pointing toward second city
+  const firstAngle = calculateAngleBetweenPoints(
+    path[0].x, path[0].y,
+    path[1].x, path[1].y
+  );
+  currentMissileAngle = firstAngle; // Initialize tracking
+  updateMissileTransform(missile, path[0].x, path[0].y, firstAngle, 0);
   setTimeout(animateNextLeg, 500);
 }
 
 // --- Move missile one leg back (animation) ---
-function animateReverseLeg(path, fromIndex, toIndex, duration) {
+function animateReverseLeg(path, fromIndex, toIndex, duration, direction) {
   const missile = svgEl ? svgEl.querySelector('#missile-marker') : null;
   if (!missile) return;
 
   const target = path[toIndex];
-  missile.style.transition = `cx ${duration}s ease-in-out, cy ${duration}s ease-in-out`;
-  missile.setAttribute('cx', target.x);
-  missile.setAttribute('cy', target.y);
+  // Calculate angle pointing from fromIndex to toIndex (the reverse direction)
+  const angle = calculateAngleBetweenPoints(
+    path[fromIndex].x, path[fromIndex].y,
+    target.x, target.y
+  );
+
+  updateMissileTransform(missile, target.x, target.y, angle, duration);
 }
 
 // --- Build progress bar ---
@@ -201,6 +389,175 @@ function updateProgressBar(reversedLegs) {
 function flash(type) {
   feedbackFlash.className = type;
   setTimeout(() => { feedbackFlash.className = ''; }, 300);
+}
+
+// --- Timer display ---
+function updateTimer(milliseconds) {
+  if (milliseconds <= 0) {
+    timerDisplay.classList.remove('visible', 'warning', 'critical');
+    timerDisplay.textContent = '';
+    return;
+  }
+
+  timerDisplay.classList.add('visible');
+
+  // Format as seconds with one decimal place (e.g., "3.4")
+  const seconds = (milliseconds / 1000).toFixed(1);
+  timerDisplay.textContent = seconds;
+
+  // Visual urgency indicators
+  timerDisplay.classList.remove('warning', 'critical');
+  if (milliseconds <= 1000) {
+    timerDisplay.classList.add('critical');
+  } else if (milliseconds <= 2000) {
+    timerDisplay.classList.add('warning');
+  }
+}
+
+// --- Explosion effect ---
+function createExplosion(x, y) {
+  if (!svgEl) return;
+
+  const explosionGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  explosionGroup.id = 'explosion-effects';
+  explosionGroup.setAttribute('transform', `translate(${x}, ${y})`);
+
+  // White-hot core expanding to orange fireball
+  const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  core.setAttribute('cx', '0');
+  core.setAttribute('cy', '0');
+  core.setAttribute('r', '2');
+  core.setAttribute('fill', '#ffffff');
+  core.setAttribute('class', 'explosion-core');
+  explosionGroup.appendChild(core);
+
+  // Multiple fireball layers with gradient colors
+  const fireballColors = ['#ffff99', '#ffcc44', '#ff8800', '#ff4400', '#cc2200'];
+  fireballColors.forEach((color, i) => {
+    const fireball = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    fireball.setAttribute('cx', '0');
+    fireball.setAttribute('cy', '0');
+    fireball.setAttribute('r', '5');
+    fireball.setAttribute('fill', color);
+    fireball.setAttribute('opacity', '0.7');
+    fireball.setAttribute('class', 'explosion-fireball');
+    fireball.style.animationDelay = `${i * 0.05}s`;
+    fireball.style.animationDuration = `${0.8 + i * 0.1}s`;
+    explosionGroup.appendChild(fireball);
+  });
+
+  // Shockwave rings with varying delays
+  const shockwaveColors = ['#ffeeaa', '#ff6600', '#ff3300'];
+  for (let i = 0; i < shockwaveColors.length; i++) {
+    const shockwave = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    shockwave.setAttribute('cx', '0');
+    shockwave.setAttribute('cy', '0');
+    shockwave.setAttribute('r', '5');
+    shockwave.setAttribute('fill', 'none');
+    shockwave.setAttribute('stroke', shockwaveColors[i]);
+    shockwave.setAttribute('stroke-width', '4');
+    shockwave.setAttribute('class', 'explosion-shockwave');
+    shockwave.style.animationDelay = `${i * 0.12}s`;
+    explosionGroup.appendChild(shockwave);
+  }
+
+  // Debris particles - varying sizes and speeds (32 particles)
+  const debrisCount = 32;
+  for (let i = 0; i < debrisCount; i++) {
+    const angle = (i / debrisCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+    const speed = 40 + Math.random() * 40;
+    const endX = Math.cos(angle) * speed;
+    const endY = Math.sin(angle) * speed;
+
+    // Random debris type
+    const debrisType = Math.random();
+
+    if (debrisType < 0.6) {
+      // Fire trails (most common)
+      const particle = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      particle.setAttribute('x1', '0');
+      particle.setAttribute('y1', '0');
+      particle.setAttribute('x2', endX);
+      particle.setAttribute('y2', endY);
+      const color = i % 3 === 0 ? '#ffaa00' : i % 3 === 1 ? '#ff6600' : '#ff3300';
+      particle.setAttribute('stroke', color);
+      particle.setAttribute('stroke-width', 1.5 + Math.random() * 1.5);
+      particle.setAttribute('stroke-linecap', 'round');
+      particle.setAttribute('class', 'explosion-debris');
+      particle.style.animationDelay = `${i * 0.015}s`;
+      particle.style.animationDuration = `${0.8 + Math.random() * 0.4}s`;
+      explosionGroup.appendChild(particle);
+    } else {
+      // Glowing embers (circles)
+      const ember = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ember.setAttribute('cx', endX * 0.7);
+      ember.setAttribute('cy', endY * 0.7);
+      ember.setAttribute('r', 1 + Math.random() * 2);
+      ember.setAttribute('fill', i % 2 === 0 ? '#ffcc00' : '#ff6600');
+      ember.setAttribute('class', 'explosion-fireball');
+      ember.style.animationDelay = `${i * 0.02}s`;
+      ember.style.animationDuration = `${1 + Math.random() * 0.5}s`;
+      explosionGroup.appendChild(ember);
+    }
+  }
+
+  // Smoke clouds (expanding gray circles)
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    const offset = 15;
+    const smoke = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    smoke.setAttribute('cx', Math.cos(angle) * offset);
+    smoke.setAttribute('cy', Math.sin(angle) * offset);
+    smoke.setAttribute('r', '10');
+    smoke.setAttribute('fill', '#333333');
+    smoke.setAttribute('opacity', '0.6');
+    smoke.setAttribute('class', 'explosion-smoke');
+    smoke.style.animationDelay = `${0.3 + i * 0.1}s`;
+    explosionGroup.appendChild(smoke);
+  }
+
+  svgEl.appendChild(explosionGroup);
+
+  // Screen flash effect
+  feedbackFlash.className = 'screen-flash';
+  feedbackFlash.style.background = 'rgba(255, 200, 100, 1)';
+  setTimeout(() => {
+    feedbackFlash.className = '';
+    feedbackFlash.style.background = '';
+  }, 500);
+
+  // Remove explosion effects after animation completes
+  setTimeout(() => {
+    explosionGroup.remove();
+  }, 2000);
+}
+
+// --- Trigger missile explosion ---
+function explodeMissile() {
+  const missile = svgEl ? svgEl.querySelector('#missile-marker') : null;
+  if (!missile) return;
+
+  // Get missile position
+  const transform = missile.getAttribute('transform');
+  const match = transform.match(/translate\(([\d.-]+),\s*([\d.-]+)\)/);
+  if (!match) return;
+
+  const x = parseFloat(match[1]);
+  const y = parseFloat(match[2]);
+
+  // Trigger explosion at missile location
+  createExplosion(x, y);
+
+  // Make missile disappear with explosion effect
+  const rotationGroup = missile.querySelector('#missile-rotation');
+  if (rotationGroup) {
+    rotationGroup.classList.add('missile-explode');
+  }
+
+  // Remove missile after explosion
+  setTimeout(() => {
+    missile.remove();
+  }, 500);
 }
 
 // --- Audio unlock ---
@@ -238,18 +595,22 @@ ws.onmessage = (event) => {
 
       if (msg.state === 'reversing') {
         if (msg.path) drawTrajectory(msg.path, msg.directions, msg.missileAt, msg.reverseLeg);
-        statusText.textContent = `Reverse the missile — ${msg.reverseLeg}/${msg.totalLegs}`;
-        directionHint.textContent = 'Use joystick to redirect';
-      } else if (msg.state === 'inactive') {
-        statusText.textContent = 'Awaiting activation';
-        directionHint.textContent = '';
-      } else if (msg.state === 'solved') {
-        if (msg.path) drawTrajectory(msg.path, msg.directions, 0, msg.totalLegs);
-        statusText.textContent = 'Missile neutralized';
-        directionHint.textContent = '';
-        solvedOverlay.classList.add('visible');
-      } else if (msg.state === 'forward_animation') {
-        statusText.textContent = 'Missile launched';
+        statusText.textContent = `Inversez le missile — ${msg.reverseLeg}/${msg.totalLegs}`;
+        directionHint.textContent = 'Utilisez le joystick pour rediriger';
+        // Timer is shown via timerUpdate events
+      } else {
+        // Hide timer when not reversing
+        updateTimer(0);
+
+        if (msg.state === 'inactive') {
+          statusText.textContent = 'En attente d\'activation';
+          directionHint.textContent = '';
+        } else if (msg.state === 'solved') {
+          // Explosion is triggered in correctInput handler when reaching position 0
+          // This state just ensures the display is updated
+        } else if (msg.state === 'forward_animation') {
+          statusText.textContent = 'Missile lancé';
+        }
       }
 
       updateDebug(msg);
@@ -261,11 +622,47 @@ ws.onmessage = (event) => {
 
     case 'correctInput':
       flash('correct');
-      animateReverseLeg(puzzleState.path, msg.fromIndex, msg.toIndex, msg.duration);
+      // Get the direction that was just reversed (the forward direction of the leg being undone)
+      // If going from index A to index B (where B < A), the forward direction was directions[B]
+      const direction = puzzleState.directions ? puzzleState.directions[msg.toIndex] : 'left';
+      animateReverseLeg(puzzleState.path, msg.fromIndex, msg.toIndex, msg.duration, direction);
+
+      // If this was the final leg (reached position 0 = Los Angeles), trigger explosion after animation
+      if (msg.toIndex === 0) {
+        setTimeout(() => {
+          explodeMissile();
+          statusText.textContent = 'Missile neutralisé';
+          directionHint.textContent = '';
+          // Show solved overlay after explosion
+          setTimeout(() => {
+            solvedOverlay.classList.add('visible');
+          }, 1000);
+        }, msg.duration * 1000 + 100); // Wait for animation + small buffer
+      }
       break;
 
     case 'wrongInput':
       flash('wrong');
+      break;
+
+    case 'timerUpdate':
+      updateTimer(msg.timeRemaining);
+      break;
+
+    case 'timeout':
+      flash('wrong');
+
+      // Show timeout popup
+      timeoutPopup.classList.add('visible');
+      setTimeout(() => {
+        timeoutPopup.classList.remove('visible');
+      }, 1500); // Show for 1.5 seconds
+
+      // Reset visual state back to starting position
+      if (puzzleState.path) {
+        drawTrajectory(puzzleState.path, puzzleState.directions, puzzleState.path.length - 1, 0);
+      }
+      updateProgressBar(0);
       break;
   }
 };
@@ -275,13 +672,37 @@ ws.onclose = () => {
 };
 
 // --- Keyboard input ---
+// Numpad for 8-way directions (matches physical numpad layout)
+// 7 8 9
+// 4   6
+// 1 2 3
+const numpadMap = {
+  '8': 'n',   // Numpad 8 (up arrow)
+  '2': 's',   // Numpad 2 (down arrow)
+  '4': 'w',   // Numpad 4 (left arrow)
+  '6': 'e',   // Numpad 6 (right arrow)
+  '7': 'nw',  // Numpad 7 (diagonal)
+  '9': 'ne',  // Numpad 9 (diagonal)
+  '1': 'sw',  // Numpad 1 (diagonal)
+  '3': 'se',  // Numpad 3 (diagonal)
+};
+
+// Arrow keys (4-way fallback for convenience)
 const arrowMap = {
-  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e',
 };
 
 document.addEventListener('keydown', (e) => {
+  // Check arrow keys first
   if (arrowMap[e.key]) {
     ws.send(JSON.stringify({ type: 'direction', direction: arrowMap[e.key] }));
+    e.preventDefault();
+    return;
+  }
+
+  // Check numpad keys
+  if (numpadMap[e.key]) {
+    ws.send(JSON.stringify({ type: 'direction', direction: numpadMap[e.key] }));
     e.preventDefault();
     return;
   }
