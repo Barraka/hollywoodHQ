@@ -15,6 +15,20 @@ const OPPOSITE = {
   se: 'nw', nw: 'se',
 };
 
+// Check if input matches expected direction (allows arrow keys to match diagonals in dev mode)
+// e.g., 'n' input matches 'n', 'ne', 'nw' expected
+function directionMatches(input, expected) {
+  if (input === expected) return true; // Exact match
+
+  // Arrow key shortcuts (n/s/e/w) can match diagonal directions
+  if (input === 'n' && (expected === 'ne' || expected === 'nw')) return true;
+  if (input === 's' && (expected === 'se' || expected === 'sw')) return true;
+  if (input === 'e' && (expected === 'ne' || expected === 'se')) return true;
+  if (input === 'w' && (expected === 'nw' || expected === 'sw')) return true;
+
+  return false;
+}
+
 class PuzzleLogic extends EventEmitter {
   constructor(joystick) {
     super();
@@ -86,6 +100,7 @@ class PuzzleLogic extends EventEmitter {
     this._stopTimer();
 
     // Reset to beginning of reversal phase (keep forward animation done)
+    // State changes to a waiting state (still REVERSING but timer is stopped)
     this.state = REVERSING;
     this.missileAt = config.path.length - 1;
     this.reverseLeg = 0;
@@ -93,8 +108,15 @@ class PuzzleLogic extends EventEmitter {
     this.emit('timeout');
     this.emit('stateChange', this.getState());
 
-    // Restart timer
-    this._startTimer();
+    // DO NOT restart timer - wait for player to click START button
+  }
+
+  // Resume after timeout - called when player clicks START button
+  resumeAfterTimeout() {
+    if (this.state === REVERSING && this.reverseLeg === 0) {
+      console.log('[puzzle5] Resuming after timeout — restarting timer');
+      this._startTimer();
+    }
   }
 
   _onDirection(dir) {
@@ -108,7 +130,7 @@ class PuzzleLogic extends EventEmitter {
 
     console.log(`[puzzle5] Input: ${dir} | Expected: ${expectedDir} (reverse of ${forwardDir})`);
 
-    if (dir === expectedDir) {
+    if (directionMatches(dir, expectedDir)) {
       // Correct! Stop timer and animate missile one leg back
       this._stopTimer();
       this.state = ANIMATE_LEG;
@@ -135,19 +157,12 @@ class PuzzleLogic extends EventEmitter {
         }
       }, config.legAnimDuration * 1000 + 200);
     } else {
-      // Wrong direction - reset to beginning
-      console.log('[puzzle5] Wrong input — resetting to beginning of reversal');
-      this._stopTimer();
+      // Wrong direction - just show error, keep position and timer running
+      console.log('[puzzle5] Wrong input — try again (timer still running)');
       this.emit('wrongInput', dir, expectedDir);
 
-      // Reset after brief feedback delay
-      setTimeout(() => {
-        this.state = REVERSING;
-        this.missileAt = config.path.length - 1;
-        this.reverseLeg = 0;
-        this.emit('stateChange', this.getState());
-        this._startTimer();
-      }, 800);
+      // Keep state as REVERSING, position unchanged, timer continues
+      // Only timeout will reset position to beginning
     }
   }
 

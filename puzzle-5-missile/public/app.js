@@ -605,6 +605,10 @@ ws.onmessage = (event) => {
         if (msg.state === 'inactive') {
           statusText.textContent = 'En attente d\'activation';
           directionHint.textContent = '';
+          // Hide solved overlay when resetting
+          solvedOverlay.classList.remove('visible');
+          // Hide timeout popup when resetting
+          timeoutPopup.classList.remove('visible');
         } else if (msg.state === 'solved') {
           // Explosion is triggered in correctInput handler when reaching position 0
           // This state just ensures the display is updated
@@ -652,11 +656,8 @@ ws.onmessage = (event) => {
     case 'timeout':
       flash('wrong');
 
-      // Show timeout popup
+      // Show timeout popup (stays visible until user clicks Start button)
       timeoutPopup.classList.add('visible');
-      setTimeout(() => {
-        timeoutPopup.classList.remove('visible');
-      }, 1500); // Show for 1.5 seconds
 
       // Reset visual state back to starting position
       if (puzzleState.path) {
@@ -720,4 +721,14 @@ function updateDebug(state) {
   if (!debugState) return;
   const cityName = state.path ? state.path[state.missileAt]?.name : '?';
   debugState.textContent = `State: ${state.state} | Missile at: ${cityName} | Reversed: ${state.reverseLeg}/${state.totalLegs}`;
+}
+
+// --- Timeout Start Button ---
+const timeoutStartBtn = document.getElementById('timeout-start-btn');
+if (timeoutStartBtn) {
+  timeoutStartBtn.addEventListener('click', () => {
+    timeoutPopup.classList.remove('visible');
+    // Tell server to resume the timer
+    ws.send(JSON.stringify({ type: 'resumeAfterTimeout' }));
+  });
 }

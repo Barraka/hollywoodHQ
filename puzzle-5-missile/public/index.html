@@ -416,6 +416,20 @@
 
     #timeout-popup.visible {
       opacity: 1;
+      pointer-events: auto;
+    }
+
+    #timeout-popup .timeout-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 25px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 3px solid rgba(255, 50, 50, 0.8);
+      padding: 30px 50px;
+      border-radius: 10px;
+      box-shadow: 0 0 40px rgba(255, 50, 50, 0.6);
+      animation: timeoutAppear 0.4s ease-out;
     }
 
     #timeout-popup .timeout-text {
@@ -424,12 +438,32 @@
       text-transform: uppercase;
       letter-spacing: 6px;
       text-shadow: 0 0 30px rgba(255, 50, 50, 0.8);
-      background: rgba(0, 0, 0, 0.8);
-      border: 3px solid rgba(255, 50, 50, 0.8);
-      padding: 30px 50px;
-      border-radius: 10px;
-      box-shadow: 0 0 40px rgba(255, 50, 50, 0.6);
-      animation: timeoutAppear 0.4s ease-out;
+    }
+
+    #timeout-popup .timeout-btn {
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      padding: 15px 40px;
+      background: rgba(255, 50, 50, 0.9);
+      color: white;
+      border: 2px solid rgba(255, 100, 100, 1);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 20px rgba(255, 50, 50, 0.5);
+    }
+
+    #timeout-popup .timeout-btn:hover {
+      background: rgba(255, 80, 80, 1);
+      box-shadow: 0 0 30px rgba(255, 50, 50, 0.8);
+      transform: scale(1.05);
+    }
+
+    #timeout-popup .timeout-btn:active {
+      transform: scale(0.98);
     }
 
     @keyframes timeoutAppear {
@@ -559,7 +593,10 @@
   </div>
 
   <div id="timeout-popup">
-    <div class="timeout-text">Trop lent, il faut être plus rapide!!</div>
+    <div class="timeout-content">
+      <div class="timeout-text">Trop lent, il faut être plus rapide!!</div>
+      <button id="timeout-start-btn" class="timeout-btn">START</button>
+    </div>
   </div>
 
   <div id="scanlines"></div>

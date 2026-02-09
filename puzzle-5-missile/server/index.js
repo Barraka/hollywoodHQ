@@ -51,6 +51,11 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log('[ws] Client connected (' + clients.size + ' total)');
 
+  // If this is the first client connecting, ensure puzzle is in fresh inactive state
+  if (clients.size === 1) {
+    puzzle.reset();
+  }
+
   ws.send(JSON.stringify({ type: 'config', mock: isMock }));
   ws.send(JSON.stringify({ type: 'state', ...puzzle.getState() }));
 
@@ -84,6 +89,10 @@ wss.on('connection', (ws) => {
 
       case 'forceSolve':
         puzzle.forceSolve();
+        break;
+
+      case 'resumeAfterTimeout':
+        puzzle.resumeAfterTimeout();
         break;
     }
   });
