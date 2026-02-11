@@ -54,9 +54,9 @@ function updatePreloadProgress() {
   if (!el) return;
   const pct = preloadTotal > 0 ? Math.round((preloadDone / preloadTotal) * 100) : 0;
   if (preloadDone < preloadTotal) {
-    el.textContent = `Loading vehicles... ${pct}%`;
+    el.textContent = `Chargement des véhicules... ${pct}%`;
   } else {
-    el.textContent = 'All vehicles loaded';
+    el.textContent = 'Tous les véhicules chargés';
     setTimeout(() => { el.style.opacity = '0'; }, 1000);
   }
 }
@@ -166,13 +166,13 @@ function showFeedback(correct) {
   setTimeout(() => { feedbackFlash.className = ''; }, 500);
 
   // Text
-  feedbackText.textContent = correct ? 'CORRECT' : 'WRONG VEHICLE';
+  feedbackText.textContent = correct ? 'CORRECT' : 'MAUVAIS VÉHICULE';
   feedbackText.className = `visible ${correct ? 'correct' : 'wrong'}`;
   setTimeout(() => { feedbackText.className = ''; }, correct ? 3000 : 2000);
 }
 
 function showSolved() {
-  feedbackText.textContent = 'VEHICLE SELECTED';
+  feedbackText.textContent = 'VÉHICULE SÉLECTIONNÉ';
   feedbackText.className = 'visible solved';
 }
 
@@ -209,11 +209,11 @@ ws.onmessage = (event) => {
       if (msg.vehicleVideo) switchVideo(msg.vehicleVideo);
 
       if (msg.state === 'browsing' || msg.state === 'feedback') {
-        statusText.textContent = 'Set levers and validate';
+        statusText.textContent = 'Réglez les leviers et validez';
       } else if (msg.state === 'inactive') {
-        statusText.textContent = 'Awaiting activation';
+        statusText.textContent = 'En attente d\'activation';
       } else if (msg.state === 'solved') {
-        statusText.textContent = 'Mission complete';
+        statusText.textContent = 'Mission accomplie';
         showSolved();
       }
 
@@ -233,12 +233,20 @@ ws.onmessage = (event) => {
     case 'validateResult':
       showFeedback(msg.correct);
       break;
+
+    case 'hackMode':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.activate();
+      break;
+
+    case 'hackResolved':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.deactivate();
+      break;
   }
 };
 
 ws.onclose = () => {
   console.log('[ws] Disconnected');
-  statusText.textContent = 'Connection lost';
+  statusText.textContent = 'Connexion perdue';
 };
 
 // --- Keyboard input ---

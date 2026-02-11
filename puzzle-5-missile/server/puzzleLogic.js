@@ -5,6 +5,7 @@ const INACTIVE = 'inactive';
 const FORWARD_ANIM = 'forward_animation';
 const REVERSING = 'reversing';
 const ANIMATE_LEG = 'animate_leg';
+const AWAITING_DETONATION = 'awaiting_detonation';
 const SOLVED = 'solved';
 
 // Opposite directions (8-way)
@@ -145,10 +146,10 @@ class PuzzleLogic extends EventEmitter {
         if (this.state !== ANIMATE_LEG) return;
 
         if (this.reverseLeg >= this.totalLegs) {
-          // All legs reversed — solved!
-          this.state = SOLVED;
+          // All legs reversed — awaiting detonation button press
+          this.state = AWAITING_DETONATION;
           this.emit('stateChange', this.getState());
-          console.log('[puzzle5] SOLVED! Missile returned to origin');
+          console.log('[puzzle5] Missile at origin — awaiting detonation button');
         } else {
           this.state = REVERSING;
           this.emit('stateChange', this.getState());
@@ -166,6 +167,14 @@ class PuzzleLogic extends EventEmitter {
     }
   }
 
+  detonate() {
+    if (this.state !== AWAITING_DETONATION) return;
+    console.log('[puzzle5] DETONATION! Explosion triggered');
+    this.state = SOLVED;
+    this.emit('detonate');
+    this.emit('stateChange', this.getState());
+  }
+
   forceSolve() {
     if (this.state === SOLVED) return;
     console.log('[puzzle5] Force-solved by GM');
@@ -173,6 +182,7 @@ class PuzzleLogic extends EventEmitter {
     this.missileAt = 0;
     this.reverseLeg = this.totalLegs;
     this.state = SOLVED;
+    this.emit('detonate');
     this.emit('stateChange', this.getState());
   }
 

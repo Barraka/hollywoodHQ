@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gadget Code — Mission: Hollywood</title>
+  <title>Screen Right — Mission: Hollywood</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -17,19 +17,75 @@
       cursor: none;
     }
 
-    /* Video element fills the screen */
-    #video-player {
+    /* =============================================
+       LAYER 1 — Tim Ferris mode
+       ============================================= */
+    #tf-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      transition: opacity 0.5s ease;
+    }
+
+    #tf-layer.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #tf-video-player {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      z-index: 1;
     }
 
-    /* HUD overlay on top of video */
-    #hud {
+    #tf-label {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      font-size: 11px;
+      color: rgba(255, 200, 100, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      z-index: 12;
+    }
+
+    /* =============================================
+       LAYER 2 — Puzzle 3 mode
+       ============================================= */
+    #p3-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #p3-layer.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #p3-video-player {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Puzzle 3 HUD overlay */
+    #p3-hud {
       position: absolute;
       top: 0;
       left: 0;
@@ -40,7 +96,7 @@
     }
 
     /* Situation indicator — top center */
-    #situation-bar {
+    #p3-situation-bar {
       position: absolute;
       top: 30px;
       left: 50%;
@@ -71,7 +127,7 @@
     }
 
     /* Code input display — bottom center */
-    #code-display {
+    #p3-code-display {
       position: absolute;
       bottom: 80px;
       left: 50%;
@@ -82,7 +138,7 @@
       transition: opacity 0.4s ease;
     }
 
-    #code-display.visible {
+    #p3-code-display.visible {
       opacity: 1;
     }
 
@@ -102,7 +158,7 @@
     }
 
     /* Feedback flash */
-    #feedback-flash {
+    #p3-feedback-flash {
       position: absolute;
       top: 0;
       left: 0;
@@ -114,18 +170,18 @@
       z-index: 5;
     }
 
-    #feedback-flash.correct {
+    #p3-feedback-flash.correct {
       background: rgba(0, 255, 100, 0.15);
       opacity: 1;
     }
 
-    #feedback-flash.wrong {
+    #p3-feedback-flash.wrong {
       background: rgba(255, 50, 50, 0.15);
       opacity: 1;
     }
 
     /* Status text — bottom */
-    #status-text {
+    #p3-status-text {
       position: absolute;
       bottom: 30px;
       left: 50%;
@@ -136,6 +192,10 @@
       letter-spacing: 3px;
       white-space: nowrap;
     }
+
+    /* =============================================
+       Shared overlays
+       ============================================= */
 
     /* Scanline effect */
     #scanlines {
@@ -258,32 +318,41 @@
   </style>
 </head>
 <body>
-  <video id="video-player" muted></video>
 
-  <div id="feedback-flash"></div>
-
-  <div id="hud">
-    <div id="situation-bar"></div>
-    <div id="code-display"></div>
-    <div id="status-text"></div>
+  <!-- LAYER 1: Tim Ferris -->
+  <div id="tf-layer">
+    <video id="tf-video-player" muted></video>
+    <div id="tf-label">Tim Ferris &mdash; Canal Sécurisé</div>
   </div>
 
+  <!-- LAYER 2: Puzzle 3 -->
+  <div id="p3-layer">
+    <video id="p3-video-player" muted></video>
+    <div id="p3-feedback-flash"></div>
+    <div id="p3-hud">
+      <div id="p3-situation-bar"></div>
+      <div id="p3-code-display"></div>
+      <div id="p3-status-text"></div>
+    </div>
+  </div>
+
+  <!-- Shared overlays -->
   <div id="scanlines"></div>
   <div id="vignette"></div>
 
+  <!-- Mock controls -->
   <div id="mock-controls">
     <div><strong>DEV CONTROLS</strong></div>
-    <div>Type digits 0-9 + Enter</div>
-    <div>Backspace to delete</div>
-    <div>Escape to clear</div>
-    <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
-    <div>A = Activate</div>
-    <div>R = Reset</div>
-    <div>F = Force Solve</div>
+    <div>M = Toggle mode</div>
+    <div>H = Hack mode</div>
+    <div>N = Normal (unhack)</div>
+    <div>T = Play TF intro clip</div>
   </div>
 
+  <!-- Debug state -->
   <div id="debug-state"></div>
 
+  <!-- Start overlay -->
   <div id="start-overlay">
     <div class="start-text">Cliquez pour commencer</div>
     <div class="start-sub">ou appuyez sur une touche</div>

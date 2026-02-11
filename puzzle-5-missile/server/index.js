@@ -17,14 +17,22 @@ const puzzle = new PuzzleLogic(joystick);
 const MIME_TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
 };
 
 const publicDir = path.join(__dirname, '..', 'public');
+const sharedBrowserDir = path.join(__dirname, '..', '..', 'shared', 'browser');
 
 const httpServer = http.createServer((req, res) => {
-  let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = filePath.split('?')[0];
-  filePath = path.join(publicDir, decodeURIComponent(filePath));
+  let urlPath = req.url === '/' ? '/index.html' : req.url;
+  urlPath = urlPath.split('?')[0];
+
+  let filePath;
+  if (urlPath.startsWith('/shared/')) {
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+  } else {
+    filePath = path.join(publicDir, decodeURIComponent(urlPath));
+  }
 
   const ext = path.extname(filePath);
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
@@ -94,6 +102,10 @@ wss.on('connection', (ws) => {
       case 'resumeAfterTimeout':
         puzzle.resumeAfterTimeout();
         break;
+
+      case 'detonate':
+        puzzle.detonate();
+        break;
     }
   });
 
@@ -133,6 +145,23 @@ if (isMock) {
   console.log('[server] Mock mode: puzzle will auto-activate when client sends "ready"');
 }
 
+// --- Explosion button (GPIO 12) ---
+let explosionButton = null;
+if (!isMock) {
+  try {
+    const Gpio = require('onoff').Gpio;
+    explosionButton = new Gpio(config.explosionButtonPin, 'in', 'falling', { debounceTimeout: 50 });
+    explosionButton.watch((err) => {
+      if (err) { console.error('[gpio] Explosion button error:', err); return; }
+      console.log('[gpio] Explosion button pressed');
+      puzzle.detonate();
+    });
+    console.log('[gpio] Explosion button on GPIO', config.explosionButtonPin);
+  } catch (e) {
+    console.warn('[gpio] Explosion button unavailable:', e.message);
+  }
+}
+
 // --- Room Controller integration ---
 const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
 
@@ -148,6 +177,16 @@ rc.on('command', (cmd) => {
 
       case 'reset':
         puzzle.reset();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'hack_mode':
+        broadcast({ type: 'hackMode' });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'hack_resolved':
+        broadcast({ type: 'hackResolved' });
         rc.sendAck(cmd.requestId, true);
         break;
 
@@ -182,6 +221,7 @@ process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   rc.disconnect();
   joystick.destroy();
+  if (explosionButton) explosionButton.unexport();
   httpServer.close();
   process.exit(0);
 });

@@ -67,6 +67,9 @@ module.exports = {
     right: 26, // shared with Puzzle 1 & 2
   },
 
+  // Explosion button (big red button on console)
+  explosionButtonPin: 12, // GPIO 12 on Props Pi (dedicated pin)
+
   // Room Controller
   roomControllerUrl: null,
   propId: 'puzzle-5-missile',

@@ -78,6 +78,14 @@ ws.onmessage = (event) => {
   if (msg.type === 'beep' && isMock) {
     playBeepInBrowser(msg.axis);
   }
+
+  if (msg.type === 'hackMode' && typeof HackGlitch !== 'undefined') {
+    HackGlitch.activate();
+  }
+
+  if (msg.type === 'hackResolved' && typeof HackGlitch !== 'undefined') {
+    HackGlitch.deactivate();
+  }
 };
 
 ws.onclose = () => {
@@ -193,22 +201,22 @@ function addCityDots() {
 function generateFeedData() {
   const templates = [
     () => 'SIG/' + (Math.random()*999|0).toString().padStart(3,'0') + ' FREQ ' + (30+Math.random()*70).toFixed(2) + ' MHz',
-    () => 'NODE ' + String.fromCharCode(65+Math.random()*26|0) + '-' + (Math.random()*99|0).toString().padStart(2,'0') + ' ACTIVE',
+    () => 'NŒUD ' + String.fromCharCode(65+Math.random()*26|0) + '-' + (Math.random()*99|0).toString().padStart(2,'0') + ' ACTIF',
     () => 'LAT ' + (-60+Math.random()*140).toFixed(3) + ' LON ' + (-170+Math.random()*340).toFixed(3),
-    () => 'INTERCEPT #' + (1000+Math.random()*9000|0) + ' LOGGED',
-    () => 'PKT ' + (Math.random()*0xFFFF|0).toString(16).toUpperCase().padStart(4,'0') + ' >> DECRYPT',
-    () => 'SCAN SECTOR ' + (Math.random()*360|0) + '\u00B0 CLEAR',
-    () => 'UPLINK ' + (Math.random()*100).toFixed(1) + '% INTEGRITY',
+    () => 'INTERCEPTION #' + (1000+Math.random()*9000|0) + ' ENREGISTRÉE',
+    () => 'PKT ' + (Math.random()*0xFFFF|0).toString(16).toUpperCase().padStart(4,'0') + ' >> DÉCRYPT',
+    () => 'SCAN SECTEUR ' + (Math.random()*360|0) + '\u00B0 RAS',
+    () => 'LIAISON ' + (Math.random()*100).toFixed(1) + '% INTÉGRITÉ',
     () => '[ ' + new Date(Date.now() - Math.random()*86400000).toISOString().slice(11,19) + ' UTC ]',
-    () => 'TRACE RTT ' + (10+Math.random()*200|0) + 'ms via ' + ['SAT-7','GND-12','SAT-3','RELAY-9'][Math.random()*4|0],
+    () => 'TRACE RTT ' + (10+Math.random()*200|0) + 'ms via ' + ['SAT-7','SOL-12','SAT-3','RELAIS-9'][Math.random()*4|0],
     () => 'AUTH TOKEN ' + Array.from({length:8},()=>(Math.random()*16|0).toString(16)).join('').toUpperCase(),
-    () => 'CHAN ' + (Math.random()*128|0) + ' ENCRYPTED AES-256',
-    () => 'ASSET ' + ['EAGLE','FALCON','CONDOR','PHOENIX','VIPER','GHOST'][Math.random()*6|0] + ' STATUS: NOMINAL',
-    () => 'PRIORITY: ' + ['LOW','MEDIUM','HIGH','CRITICAL'][Math.random()*4|0],
-    () => 'BANDWIDTH ' + (1+Math.random()*50).toFixed(1) + ' Gbps',
-    () => 'SAT-PASS IN ' + (Math.random()*60|0) + 'm ' + (Math.random()*60|0) + 's',
-    () => 'ENC VERIFY .......... OK',
-    () => '--- END BLOCK ' + (Math.random()*9999|0).toString().padStart(4,'0') + ' ---',
+    () => 'CANAL ' + (Math.random()*128|0) + ' CHIFFRÉ AES-256',
+    () => 'AGENT ' + ['AIGLE','FAUCON','CONDOR','PHOENIX','VIPÈRE','FANTÔME'][Math.random()*6|0] + ' STATUT : NOMINAL',
+    () => 'PRIORITÉ : ' + ['BASSE','MOYENNE','HAUTE','CRITIQUE'][Math.random()*4|0],
+    () => 'BANDE PASSANTE ' + (1+Math.random()*50).toFixed(1) + ' Gbps',
+    () => 'PASSAGE SAT DANS ' + (Math.random()*60|0) + 'm ' + (Math.random()*60|0) + 's',
+    () => 'VÉRIF CHIFFR .......... OK',
+    () => '--- FIN BLOC ' + (Math.random()*9999|0).toString().padStart(4,'0') + ' ---',
   ];
 
   const feedInner = document.getElementById('data-feed-inner');
@@ -235,10 +243,10 @@ setTimeout(triggerGlitch, 3000 + Math.random() * 5000);
 
 // ── Typing Status Messages ──
 const statusMsgs = [
-  'SCANNING FREQUENCIES...', 'DECRYPTING SIGNAL...', 'AWAITING TARGET LOCK...',
-  'TRIANGULATING POSITION...', 'SATELLITE UPLINK ACTIVE...', 'ANALYZING INTERCEPT DATA...',
-  'ROUTING THROUGH PROXY...', 'VERIFYING ASSET CREDENTIALS...', 'MONITORING CHANNELS...',
-  'SIGNAL ACQUISITION IN PROGRESS...', 'CROSS-REFERENCING DATABASE...', 'SECURE LINK ESTABLISHED...',
+  'BALAYAGE DES FRÉQUENCES...', 'DÉCRYPTAGE DU SIGNAL...', 'EN ATTENTE DE VERROUILLAGE...',
+  'TRIANGULATION DE LA POSITION...', 'LIAISON SATELLITE ACTIVE...', 'ANALYSE DES INTERCEPTIONS...',
+  'ROUTAGE VIA PROXY...', 'VÉRIFICATION DES IDENTIFIANTS...', 'SURVEILLANCE DES CANAUX...',
+  'ACQUISITION DU SIGNAL EN COURS...', 'RECOUPEMENT BASE DE DONNÉES...', 'LIAISON SÉCURISÉE ÉTABLIE...',
 ];
 
 const statusTextEl = document.getElementById('status-text');

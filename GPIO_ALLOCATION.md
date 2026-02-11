@@ -29,6 +29,7 @@ Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 0-27).
 | **7** | **Button 8 LED** | — | — |
 | **8** | **Button 9 LED** | — | — |
 | **9** | **Button 10 LED** | — | — |
+| **12** | — | — | **Explosion Button** |
 | **13** | **Button 7 IN** | — | — |
 | **14** | **Button 10 IN** | — | — |
 | **16** | **Button 1 IN** | **X Encoder CLK** | **Joystick Up** |
@@ -40,7 +41,7 @@ Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 0-27).
 | **26** | **Button 4 IN** | **Y Encoder DT** | **Joystick Right** |
 | **27** | **Button 8 IN** | — | — |
 
-**Total Props Pi Pins**: 20 (16 unique + 4 shared) ✅
+**Total Props Pi Pins**: 21 (17 unique + 4 shared) ✅
 
 ---
 
@@ -107,8 +108,8 @@ Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 0-27).
 **Props Pi:**
 - Puzzle 1: 16 unique pins (10 button inputs: 4 shared + 6 unique, 10 LED outputs)
 - Puzzle 2: 4 shared pins (with Puzzle 1 & 5)
-- Puzzle 5: 4 shared pins (with Puzzle 1 & 2)
-- **Props Pi Total: 20 pins** ✅
+- Puzzle 5: 4 shared pins (with Puzzle 1 & 2) + 1 unique (explosion button GPIO 12)
+- **Props Pi Total: 21 pins** ✅
 
 **Narrative Pi:**
 - Puzzle 3: 5 pins (2 keypad + 3 LEDs)
@@ -140,9 +141,10 @@ Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering: GPIO 0-27).
 - X Encoder CLK: GPIO 16, DT: GPIO 20
 - Y Encoder CLK: GPIO 19, DT: GPIO 26
 
-#### Puzzle 5: Missile Trajectory (4 pins - all shared with P1 & P2)
+#### Puzzle 5: Missile Trajectory (5 pins - 4 shared with P1 & P2, 1 unique)
 - Joystick Up: GPIO 16, Down: GPIO 20
 - Joystick Left: GPIO 19, Right: GPIO 26
+- Explosion Button (big red button): GPIO 12 (unique, dedicated)
 
 ### Narrative Pi (Raspberry Pi #2)
 

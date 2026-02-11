@@ -5,8 +5,9 @@ Automated setup scripts for deploying Mission: Hollywood escape room on 2 Raspbe
 ## Prerequisites
 
 - 2× Raspberry Pi 4 or 5 (4GB+ RAM recommended)
-- Raspberry Pi OS Lite (64-bit) or Desktop installed
-- SSH enabled on both Pis
+- 1× Raspberry Pi Zero 2 W (for Vehicle display)
+- Raspberry Pi OS Lite (64-bit) or Desktop installed on all Pis
+- SSH enabled on all Pis
 - Internet connection during initial setup
 
 ## Quick Start
@@ -23,25 +24,30 @@ cd hollywoodHQ
 
 ### 2. Run Setup Script
 
-**Props Pi (Puzzles 1, 2, 5 + World Map Display):**
+**Props Pi (Puzzles 1, 2, 5 + Immersion Screen):**
 ```bash
 cd raspberry-pi
 sudo ./setup-props-pi.sh
 ```
 
-**Narrative Pi (Puzzles 3, 4 + Story Screen):**
+**Narrative Pi (Puzzles 3, 4 + Villain Screen + Right Screen):**
 ```bash
 cd raspberry-pi
 sudo ./setup-narrative-pi.sh
 ```
 
-The script will:
-- Install Node.js and dependencies
-- Install all puzzle npm packages
+**Vehicle Pi Zero (display-only kiosk for Puzzle 4):**
+```bash
+cd raspberry-pi
+sudo ./setup-vehicle-pi-zero.sh 192.168.1.11   # Narrative Pi IP
+```
+
+Each setup script will:
+- Install Node.js and dependencies (Props/Narrative only)
+- Install all puzzle/screen npm packages
 - Configure systemd services
-- Set up Chromium kiosk mode
+- Set up dual-display Chromium kiosk mode (or single kiosk for Pi Zero)
 - Optimize system settings
-- Configure static IP (optional)
 
 ### 3. Configure Room Controller URL
 
@@ -114,12 +120,18 @@ hdmi_mode=82               # 1920x1080 @ 60Hz
 sudo systemctl status puzzle-1-simon
 sudo systemctl status puzzle-2-world-map
 sudo systemctl status puzzle-5-missile
+sudo systemctl status screen-immersion
 sudo systemctl status chromium-kiosk-props
 
 # Narrative Pi
 sudo systemctl status puzzle-3-gadget-code
 sudo systemctl status puzzle-4-vehicle
+sudo systemctl status screen-villain
+sudo systemctl status screen-right
 sudo systemctl status chromium-kiosk-narrative
+
+# Vehicle Pi Zero
+sudo systemctl status chromium-kiosk-vehicle
 ```
 
 ### View Logs
@@ -195,6 +207,7 @@ raspberry-pi/
 ├── README.md                           # This file
 ├── setup-props-pi.sh                   # Props Pi setup script
 ├── setup-narrative-pi.sh               # Narrative Pi setup script
+├── setup-vehicle-pi-zero.sh            # Vehicle Pi Zero setup script
 ├── configure-room-controller.sh        # Update Room Controller URL
 ├── services/
 │   ├── puzzle-1-simon.service          # Puzzle 1 systemd service
@@ -202,10 +215,14 @@ raspberry-pi/
 │   ├── puzzle-3-gadget-code.service    # Puzzle 3 systemd service
 │   ├── puzzle-4-vehicle.service        # Puzzle 4 systemd service
 │   ├── puzzle-5-missile.service        # Puzzle 5 systemd service
-│   ├── chromium-kiosk-props.service    # Chromium kiosk for Props Pi
-│   └── chromium-kiosk-narrative.service # Chromium kiosk for Narrative Pi
+│   ├── screen-villain.service          # Villain screen service
+│   ├── screen-immersion.service        # Immersion screen service
+│   ├── screen-right.service            # Right screen (Tim Ferris + P3) service
+│   ├── chromium-kiosk-props.service    # Dual-display kiosk for Props Pi
+│   └── chromium-kiosk-narrative.service # Dual-display kiosk for Narrative Pi
 └── scripts/
-    └── start-kiosk.sh                  # Chromium kiosk launcher
+    ├── start-kiosk-props.sh            # Props Pi kiosk launcher (HDMI-0 + HDMI-1)
+    └── start-kiosk-narrative.sh        # Narrative Pi kiosk launcher (HDMI-0 + HDMI-1)
 ```
 
 ---
@@ -213,27 +230,35 @@ raspberry-pi/
 ## Network Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Local Network                        │
-│                   (192.168.1.0/24)                      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  GM Laptop (192.168.1.100)                              │
-│  ├─ GM Dashboard (React app)                            │
-│  └─ Room Controller (WebSocket server :3001)            │
-│                                                          │
-│  Props Pi (192.168.1.10)                                │
-│  ├─ Puzzle 1: Simon (:3004)                             │
-│  ├─ Puzzle 2: World Map (:3000)                         │
-│  ├─ Puzzle 5: Missile (:3003)                           │
-│  └─ HDMI → World Map Display                            │
-│                                                          │
-│  Narrative Pi (192.168.1.11)                            │
-│  ├─ Puzzle 3: Gadget Code (:3001)                       │
-│  ├─ Puzzle 4: Vehicle (:3002)                           │
-│  └─ HDMI → Story/Virtual Assistant Screen               │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Local Network                           │
+│                     (192.168.1.0/24)                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  GM Laptop (192.168.1.100)                                   │
+│  ├─ GM Dashboard (React app)                                 │
+│  └─ Room Controller (WebSocket server :3001)                 │
+│                                                              │
+│  Props Pi (192.168.1.10)                                     │
+│  ├─ Puzzle 1: Simon (:3004)                                  │
+│  ├─ Puzzle 2: World Map (:3000)                              │
+│  ├─ Puzzle 5: Missile (:3003)                                │
+│  ├─ Screen: Immersion (:3011)                                │
+│  ├─ HDMI-0 → World Map Display                               │
+│  └─ HDMI-1 → Immersion Dashboard                             │
+│                                                              │
+│  Narrative Pi (192.168.1.11)                                 │
+│  ├─ Puzzle 3: Gadget Code (:3001)                            │
+│  ├─ Puzzle 4: Vehicle (:3002)                                │
+│  ├─ Screen: Villain (:3010)                                  │
+│  ├─ Screen: Right / Tim Ferris + P3 (:3012)                  │
+│  ├─ HDMI-0 → Villain Screen (left)                           │
+│  └─ HDMI-1 → Right Screen (Tim Ferris + Puzzle 3)            │
+│                                                              │
+│  Vehicle Pi Zero (192.168.1.12, WiFi)                        │
+│  └─ Chromium kiosk → http://192.168.1.11:3002                │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -244,7 +269,8 @@ raspberry-pi/
 - [ ] 10× arcade buttons wired to GPIO (see GPIO_ALLOCATION.md)
 - [ ] 2× KY-040 rotary encoders wired
 - [ ] 8-way arcade joystick wired
-- [ ] HDMI cable to world map display
+- [ ] HDMI-0 cable to world map display (central)
+- [ ] HDMI-1 cable to immersion dashboard (small right)
 - [ ] Power supply connected
 - [ ] Network cable or WiFi configured
 
@@ -253,22 +279,30 @@ raspberry-pi/
 - [ ] 3× LEDs wired to GPIO 24, 25, 12
 - [ ] 4× 10-position rotary switches wired
 - [ ] 2× navigation buttons + validate button wired
-- [ ] HDMI cable to story screen
+- [ ] HDMI-0 cable to villain screen (left)
+- [ ] HDMI-1 cable to right screen (Tim Ferris + Puzzle 3)
 - [ ] Power supply connected
 - [ ] Network cable or WiFi configured
+
+**Vehicle Pi Zero:**
+- [ ] HDMI cable to vehicle display (small)
+- [ ] Power supply connected
+- [ ] WiFi configured to reach Narrative Pi (192.168.1.11)
 
 ---
 
 ## Production Deployment
 
-1. Flash fresh Raspberry Pi OS on both SD cards
+1. Flash fresh Raspberry Pi OS on all 3 SD cards (Desktop for Props/Narrative, Lite for Pi Zero)
 2. Enable SSH (`touch /boot/ssh` on SD card before first boot)
-3. Boot both Pis and SSH in
-4. Run setup scripts on each Pi
-5. Configure Room Controller URL
-6. Test each puzzle independently
-7. Test full sequential playthrough
-8. Reboot and verify auto-start
+3. Boot all Pis and SSH in
+4. Clone repository on Props Pi and Narrative Pi
+5. Run setup scripts on each Pi (Props, Narrative, Vehicle Pi Zero)
+6. Configure Room Controller URL on Props Pi and Narrative Pi
+7. Test each puzzle and screen independently
+8. Test hack mode synchronization (all screens glitch together)
+9. Test full sequential playthrough
+10. Reboot and verify auto-start
 
 ---
 
@@ -289,7 +323,9 @@ sudo systemctl restart puzzle-1-simon
 # Backup all configs
 tar -czf hollywood-config-backup.tar.gz \
   ~/hollywoodHQ/puzzle-*/config.js \
+  ~/hollywoodHQ/screen-*/config.js \
   /etc/systemd/system/puzzle-*.service \
+  /etc/systemd/system/screen-*.service \
   /etc/systemd/system/chromium-kiosk-*.service
 ```
 

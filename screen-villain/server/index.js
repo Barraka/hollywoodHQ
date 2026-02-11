@@ -3,30 +3,23 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
-const LEDs = require('./leds');
-const Keypad = require('./keypad');
-const PuzzleLogic = require('./puzzleLogic');
 const RoomControllerClient = require('../../shared/roomController');
 
 // --- Detect mock mode ---
 const isMock = process.argv.includes('--mock');
 if (isMock) console.log('[server] Running in MOCK mode');
 
-// --- Initialize modules ---
-const leds = new LEDs(isMock);
-const keypad = new Keypad(isMock);
-const puzzle = new PuzzleLogic(leds);
+// --- Screen state ---
+let state = {
+  mode: 'idle',       // 'idle' | 'clip' | 'hack'
+  currentClip: null,
+};
 
-// --- Wire GPIO keypad events directly to puzzle logic ---
-keypad.on('keypress', (key) => {
-  if (key >= '0' && key <= '9') {
-    puzzle.digitPressed(key);
-  } else if (key === '#') {
-    puzzle.submitCode();
-  } else if (key === '*') {
-    puzzle.clearCode();
-  }
-});
+function setState(changes) {
+  Object.assign(state, changes);
+  broadcast({ type: 'state', ...state });
+  rc.updateState({ mode: state.mode, currentClip: state.currentClip });
+}
 
 // --- HTTP server (serves frontend + video files) ---
 const MIME_TYPES = {
@@ -45,14 +38,16 @@ const publicDir = path.join(__dirname, '..', 'public');
 const sharedBrowserDir = path.join(__dirname, '..', '..', 'shared', 'browser');
 
 const httpServer = http.createServer((req, res) => {
-  let urlPath = req.url === '/' ? '/index.html' : req.url;
-  urlPath = urlPath.split('?')[0];
+  let filePath = req.url === '/' ? '/index.html' : req.url;
+  // Strip query string
+  filePath = filePath.split('?')[0];
 
-  let filePath;
-  if (urlPath.startsWith('/shared/')) {
-    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+  // Serve shared browser files (e.g. /shared/glitch.js → ../../shared/browser/glitch.js)
+  if (filePath.startsWith('/shared/')) {
+    const sharedFile = filePath.replace('/shared/', '');
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(sharedFile));
   } else {
-    filePath = path.join(publicDir, decodeURIComponent(urlPath));
+    filePath = path.join(publicDir, decodeURIComponent(filePath));
   }
 
   const ext = path.extname(filePath);
@@ -119,74 +114,58 @@ wss.on('connection', (ws) => {
   console.log('[ws] Client connected (' + clients.size + ' total)');
 
   // Send config with full video manifest for preloading
-  const videoManifest = [
-    ...config.situations.map(s => s.video),
-    config.videos.intro,
-    config.videos.correct,
-    config.videos.wrong,
-    config.videos.solved,
-    config.videos.idle,
-  ];
+  const videoManifest = Object.values(config.videos);
   ws.send(JSON.stringify({ type: 'config', mock: isMock, videos: videoManifest }));
 
   // Send current state
-  ws.send(JSON.stringify({ type: 'state', ...puzzle.getState() }));
+  ws.send(JSON.stringify({ type: 'state', ...state }));
 
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
-      case 'clipEnded':
-        // A video clip finished playing in the browser
-        puzzle.clipEnded(msg.clipId);
-        break;
-
-      case 'situationClipEnded':
-        // A situation description clip finished
-        puzzle.situationClipEnded();
-        break;
-
-      case 'digit':
-        // Numpad digit pressed (from browser keyboard events)
-        puzzle.digitPressed(msg.digit);
-        break;
-
-      case 'submit':
-        // Enter key pressed
-        puzzle.submitCode();
-        break;
-
-      case 'delete':
-        // Backspace pressed
-        puzzle.deleteDigit();
-        break;
-
-      case 'clear':
-        // Escape pressed
-        puzzle.clearCode();
-        break;
-
       case 'ready':
         // Client signals audio unlocked + videos preloaded
-        // In mock mode, auto-activate the puzzle
-        if (isMock && puzzle.getState().state === 'inactive') {
-          console.log('[server] Client ready, auto-activating puzzle');
-          puzzle.activate();
+        console.log('[ws] Client ready');
+        ws.send(JSON.stringify({ type: 'state', ...state }));
+        break;
+
+      case 'clipEnded':
+        // A video clip finished playing in the browser
+        console.log('[video] Clip ended:', msg.filename);
+        setState({ mode: 'idle', currentClip: null });
+        break;
+
+      // --- Mock controls ---
+      case 'activate':
+        if (isMock) {
+          console.log('[mock] Playing intro clip');
+          setState({ mode: 'clip', currentClip: config.videos.intro });
+          broadcast({ type: 'playClip', filename: config.videos.intro });
         }
         break;
 
-      // GM commands
-      case 'activate':
-        puzzle.activate();
+      case 'hackMode':
+        if (isMock) {
+          console.log('[mock] Hack mode activated');
+          setState({ mode: 'hack', currentClip: null });
+          broadcast({ type: 'hackMode' });
+        }
+        break;
+
+      case 'hackResolved':
+        if (isMock) {
+          console.log('[mock] Hack resolved');
+          setState({ mode: 'idle', currentClip: null });
+          broadcast({ type: 'hackResolved' });
+        }
         break;
 
       case 'reset':
-        puzzle.reset();
-        break;
-
-      case 'forceSolve':
-        puzzle.forceSolve();
+        console.log('[server] Reset');
+        setState({ mode: 'idle', currentClip: null });
+        broadcast({ type: 'reset' });
         break;
     }
   });
@@ -197,32 +176,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-// --- Wire puzzle events to WebSocket ---
-puzzle.on('playClip', (filename, clipId) => {
-  broadcast({ type: 'playClip', filename, clipId });
-});
-
-puzzle.on('showIdle', (situationIndex) => {
-  broadcast({ type: 'showIdle', situationIndex });
-});
-
-puzzle.on('codeProgress', (entered, total) => {
-  broadcast({ type: 'codeProgress', entered, total });
-});
-
-puzzle.on('codeResult', (correct, code) => {
-  broadcast({ type: 'codeResult', correct, code });
-});
-
-puzzle.on('stateChange', (state) => {
-  broadcast({ type: 'state', ...state });
-});
-
-// --- Auto-activate in mock mode ---
-if (isMock) {
-  console.log('[server] Mock mode: puzzle will auto-activate when client sends "ready"');
-}
-
 // --- Room Controller integration ---
 const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
 
@@ -231,23 +184,31 @@ rc.on('command', (cmd) => {
 
   try {
     switch (cmd.command) {
-      case 'force_solve':
-        puzzle.forceSolve();
-        rc.sendAck(cmd.requestId, true);
-        break;
-
-      case 'reset':
-        puzzle.reset();
-        rc.sendAck(cmd.requestId, true);
-        break;
-
       case 'hack_mode':
+        setState({ mode: 'hack', currentClip: null });
         broadcast({ type: 'hackMode' });
         rc.sendAck(cmd.requestId, true);
         break;
 
       case 'hack_resolved':
+        setState({ mode: 'idle', currentClip: null });
         broadcast({ type: 'hackResolved' });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'play_clip':
+        if (cmd.filename) {
+          setState({ mode: 'clip', currentClip: cmd.filename });
+          broadcast({ type: 'playClip', filename: cmd.filename });
+          rc.sendAck(cmd.requestId, true);
+        } else {
+          rc.sendAck(cmd.requestId, false, 'Missing filename');
+        }
+        break;
+
+      case 'reset':
+        setState({ mode: 'idle', currentClip: null });
+        broadcast({ type: 'reset' });
         rc.sendAck(cmd.requestId, true);
         break;
 
@@ -261,29 +222,18 @@ rc.on('command', (cmd) => {
   }
 });
 
-// Wire puzzle state changes to Room Controller
-puzzle.on('stateChange', (state) => {
-  rc.updateState({
-    state: state.state,
-    progress: state.solvedCount / config.situations.length
-  });
-});
-
 rc.connect();
 
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
   console.log('[server] http://localhost:' + config.httpPort);
-  console.log('[puzzle3] Situations:', config.situations.length);
-  console.log('[puzzle3] Codes:', config.situations.map((s, i) => `S${i + 1}=${s.correctCode}`).join(', '));
+  console.log('[screen-villain] Videos:', Object.keys(config.videos).join(', '));
 });
 
 // --- Graceful shutdown ---
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   rc.disconnect();
-  leds.destroy();
-  keypad.destroy();
   httpServer.close();
   process.exit(0);
 });

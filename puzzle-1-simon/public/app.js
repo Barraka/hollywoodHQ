@@ -107,6 +107,14 @@ ws.onmessage = (event) => {
     case 'wrongPress':
       flash('wrong');
       break;
+
+    case 'hackMode':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.activate();
+      break;
+
+    case 'hackResolved':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.deactivate();
+      break;
   }
 };
 

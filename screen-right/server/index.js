@@ -3,30 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
-const LEDs = require('./leds');
-const Keypad = require('./keypad');
-const PuzzleLogic = require('./puzzleLogic');
 const RoomControllerClient = require('../../shared/roomController');
 
 // --- Detect mock mode ---
 const isMock = process.argv.includes('--mock');
 if (isMock) console.log('[server] Running in MOCK mode');
 
-// --- Initialize modules ---
-const leds = new LEDs(isMock);
-const keypad = new Keypad(isMock);
-const puzzle = new PuzzleLogic(leds);
-
-// --- Wire GPIO keypad events directly to puzzle logic ---
-keypad.on('keypress', (key) => {
-  if (key >= '0' && key <= '9') {
-    puzzle.digitPressed(key);
-  } else if (key === '#') {
-    puzzle.submitCode();
-  } else if (key === '*') {
-    puzzle.clearCode();
-  }
-});
+// --- Screen mode ---
+// 'tim-ferris' | 'puzzle-3' | 'hack'
+let currentMode = 'tim-ferris';
+let modeBeforeHack = 'tim-ferris'; // Remember mode before hack for restoration
 
 // --- HTTP server (serves frontend + video files) ---
 const MIME_TYPES = {
@@ -46,11 +32,15 @@ const sharedBrowserDir = path.join(__dirname, '..', '..', 'shared', 'browser');
 
 const httpServer = http.createServer((req, res) => {
   let urlPath = req.url === '/' ? '/index.html' : req.url;
+  // Strip query string
   urlPath = urlPath.split('?')[0];
 
   let filePath;
+
+  // Route /shared/* to shared/browser/ directory
   if (urlPath.startsWith('/shared/')) {
-    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+    const relativePath = urlPath.slice('/shared/'.length);
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(relativePath));
   } else {
     filePath = path.join(publicDir, decodeURIComponent(urlPath));
   }
@@ -118,75 +108,45 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log('[ws] Client connected (' + clients.size + ' total)');
 
-  // Send config with full video manifest for preloading
-  const videoManifest = [
-    ...config.situations.map(s => s.video),
-    config.videos.intro,
-    config.videos.correct,
-    config.videos.wrong,
-    config.videos.solved,
-    config.videos.idle,
-  ];
-  ws.send(JSON.stringify({ type: 'config', mock: isMock, videos: videoManifest }));
+  // Build Tim Ferris video manifest for preloading
+  const tfVideos = Object.values(config.videos);
 
-  // Send current state
-  ws.send(JSON.stringify({ type: 'state', ...puzzle.getState() }));
+  // Send config with video manifest and puzzle 3 URL
+  ws.send(JSON.stringify({
+    type: 'config',
+    mock: isMock,
+    videos: tfVideos,
+    puzzle3Url: config.puzzle3Url,
+    mode: currentMode,
+  }));
 
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
-      case 'clipEnded':
-        // A video clip finished playing in the browser
-        puzzle.clipEnded(msg.clipId);
+      case 'switchMode':
+        // Mock control: toggle between tim-ferris and puzzle-3
+        if (currentMode === 'hack') break; // Don't switch during hack
+        currentMode = currentMode === 'tim-ferris' ? 'puzzle-3' : 'tim-ferris';
+        console.log('[server] Mode switched to:', currentMode);
+        broadcast({ type: 'modeChange', mode: currentMode });
+        rc.updateState({ mode: currentMode });
         break;
 
-      case 'situationClipEnded':
-        // A situation description clip finished
-        puzzle.situationClipEnded();
-        break;
-
-      case 'digit':
-        // Numpad digit pressed (from browser keyboard events)
-        puzzle.digitPressed(msg.digit);
-        break;
-
-      case 'submit':
-        // Enter key pressed
-        puzzle.submitCode();
-        break;
-
-      case 'delete':
-        // Backspace pressed
-        puzzle.deleteDigit();
-        break;
-
-      case 'clear':
-        // Escape pressed
-        puzzle.clearCode();
+      case 'setMode':
+        // Explicit mode set
+        if (msg.mode === 'tim-ferris' || msg.mode === 'puzzle-3') {
+          currentMode = msg.mode;
+          console.log('[server] Mode set to:', currentMode);
+          broadcast({ type: 'modeChange', mode: currentMode });
+          rc.updateState({ mode: currentMode });
+        }
         break;
 
       case 'ready':
         // Client signals audio unlocked + videos preloaded
-        // In mock mode, auto-activate the puzzle
-        if (isMock && puzzle.getState().state === 'inactive') {
-          console.log('[server] Client ready, auto-activating puzzle');
-          puzzle.activate();
-        }
-        break;
-
-      // GM commands
-      case 'activate':
-        puzzle.activate();
-        break;
-
-      case 'reset':
-        puzzle.reset();
-        break;
-
-      case 'forceSolve':
-        puzzle.forceSolve();
+        console.log('[server] Client ready');
         break;
     }
   });
@@ -197,32 +157,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-// --- Wire puzzle events to WebSocket ---
-puzzle.on('playClip', (filename, clipId) => {
-  broadcast({ type: 'playClip', filename, clipId });
-});
-
-puzzle.on('showIdle', (situationIndex) => {
-  broadcast({ type: 'showIdle', situationIndex });
-});
-
-puzzle.on('codeProgress', (entered, total) => {
-  broadcast({ type: 'codeProgress', entered, total });
-});
-
-puzzle.on('codeResult', (correct, code) => {
-  broadcast({ type: 'codeResult', correct, code });
-});
-
-puzzle.on('stateChange', (state) => {
-  broadcast({ type: 'state', ...state });
-});
-
-// --- Auto-activate in mock mode ---
-if (isMock) {
-  console.log('[server] Mock mode: puzzle will auto-activate when client sends "ready"');
-}
-
 // --- Room Controller integration ---
 const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
 
@@ -231,23 +165,68 @@ rc.on('command', (cmd) => {
 
   try {
     switch (cmd.command) {
-      case 'force_solve':
-        puzzle.forceSolve();
+      case 'play_clip': {
+        // Play a Tim Ferris clip by key name (e.g., 'intro', 'escape1', 'rescued')
+        const clipKey = cmd.clip || cmd.payload?.clip;
+        const filename = config.videos[clipKey];
+        if (filename) {
+          // Ensure we're in Tim Ferris mode
+          if (currentMode !== 'tim-ferris' && currentMode !== 'hack') {
+            currentMode = 'tim-ferris';
+            broadcast({ type: 'modeChange', mode: currentMode });
+          }
+          broadcast({ type: 'playClip', filename, clipId: 'tf-' + clipKey });
+          console.log('[rc] Playing Tim Ferris clip:', clipKey, '->', filename);
+          rc.sendAck(cmd.requestId, true);
+        } else {
+          console.log('[rc] Unknown clip key:', clipKey);
+          rc.sendAck(cmd.requestId, false, 'Unknown clip: ' + clipKey);
+        }
+        break;
+      }
+
+      case 'show_puzzle_3':
+        currentMode = 'puzzle-3';
+        modeBeforeHack = 'puzzle-3';
+        console.log('[rc] Switching to Puzzle 3 mode');
+        broadcast({ type: 'modeChange', mode: currentMode });
+        rc.updateState({ mode: currentMode });
         rc.sendAck(cmd.requestId, true);
         break;
 
-      case 'reset':
-        puzzle.reset();
+      case 'show_tim_ferris':
+        currentMode = 'tim-ferris';
+        modeBeforeHack = 'tim-ferris';
+        console.log('[rc] Switching to Tim Ferris mode');
+        broadcast({ type: 'modeChange', mode: currentMode });
+        rc.updateState({ mode: currentMode });
         rc.sendAck(cmd.requestId, true);
         break;
 
       case 'hack_mode':
+        modeBeforeHack = currentMode;
+        currentMode = 'hack';
+        console.log('[rc] Hack mode activated');
         broadcast({ type: 'hackMode' });
+        rc.updateState({ mode: currentMode });
         rc.sendAck(cmd.requestId, true);
         break;
 
       case 'hack_resolved':
+        currentMode = modeBeforeHack;
+        console.log('[rc] Hack resolved, restoring mode:', currentMode);
         broadcast({ type: 'hackResolved' });
+        broadcast({ type: 'modeChange', mode: currentMode });
+        rc.updateState({ mode: currentMode });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'reset':
+        currentMode = 'tim-ferris';
+        modeBeforeHack = 'tim-ferris';
+        console.log('[rc] Reset');
+        broadcast({ type: 'reset' });
+        rc.updateState({ mode: currentMode });
         rc.sendAck(cmd.requestId, true);
         break;
 
@@ -261,29 +240,20 @@ rc.on('command', (cmd) => {
   }
 });
 
-// Wire puzzle state changes to Room Controller
-puzzle.on('stateChange', (state) => {
-  rc.updateState({
-    state: state.state,
-    progress: state.solvedCount / config.situations.length
-  });
-});
-
 rc.connect();
 
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
   console.log('[server] http://localhost:' + config.httpPort);
-  console.log('[puzzle3] Situations:', config.situations.length);
-  console.log('[puzzle3] Codes:', config.situations.map((s, i) => `S${i + 1}=${s.correctCode}`).join(', '));
+  console.log('[screen-right] Mode:', currentMode);
+  console.log('[screen-right] Puzzle 3 URL:', config.puzzle3Url);
+  console.log('[screen-right] Tim Ferris videos:', Object.keys(config.videos).join(', '));
 });
 
 // --- Graceful shutdown ---
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   rc.disconnect();
-  leds.destroy();
-  keypad.destroy();
   httpServer.close();
   process.exit(0);
 });

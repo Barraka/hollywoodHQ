@@ -44,11 +44,18 @@ const MIME_TYPES = {
 };
 
 const publicDir = path.join(__dirname, '..', 'public');
+const sharedBrowserDir = path.join(__dirname, '..', '..', 'shared', 'browser');
 
 const httpServer = http.createServer((req, res) => {
-  let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = filePath.split('?')[0];
-  filePath = path.join(publicDir, decodeURIComponent(filePath));
+  let urlPath = req.url === '/' ? '/index.html' : req.url;
+  urlPath = urlPath.split('?')[0];
+
+  let filePath;
+  if (urlPath.startsWith('/shared/')) {
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+  } else {
+    filePath = path.join(publicDir, decodeURIComponent(urlPath));
+  }
 
   const ext = path.extname(filePath);
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
@@ -197,6 +204,16 @@ rc.on('command', (cmd) => {
 
       case 'reset':
         puzzle.reset();
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'hack_mode':
+        broadcast({ type: 'hackMode' });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'hack_resolved':
+        broadcast({ type: 'hackResolved' });
         rc.sendAck(cmd.requestId, true);
         break;
 

@@ -15,6 +15,7 @@ const timerDisplay = document.getElementById('timer-display');
 const statusText = document.getElementById('status-text');
 const feedbackFlash = document.getElementById('feedback-flash');
 const solvedOverlay = document.getElementById('solved-overlay');
+const detonationOverlay = document.getElementById('detonation-overlay');
 const timeoutPopup = document.getElementById('timeout-popup');
 const mockControls = document.getElementById('mock-controls');
 const debugState = document.getElementById('debug-state');
@@ -312,7 +313,7 @@ function animateForward(path, directions, duration) {
   const legDuration = duration / (path.length - 1);
   let currentLeg = 0;
 
-  statusText.textContent = 'Missile launched';
+  statusText.textContent = 'Missile lancé';
   directionHint.textContent = '';
 
   function animateNextLeg() {
@@ -560,6 +561,21 @@ function explodeMissile() {
   }, 500);
 }
 
+// --- Missile blink (awaiting detonation) ---
+let missileBlinkInterval = null;
+
+function startMissileBlink() {
+  stopMissileBlink();
+  const missile = svgEl ? svgEl.querySelector('#missile-marker') : null;
+  if (!missile) return;
+  missile.classList.add('missile-blink');
+}
+
+function stopMissileBlink() {
+  const missile = svgEl ? svgEl.querySelector('#missile-marker') : null;
+  if (missile) missile.classList.remove('missile-blink');
+}
+
 // --- Audio unlock ---
 function unlockAudio() {
   if (audioUnlocked) return;
@@ -605,13 +621,23 @@ ws.onmessage = (event) => {
         if (msg.state === 'inactive') {
           statusText.textContent = 'En attente d\'activation';
           directionHint.textContent = '';
-          // Hide solved overlay when resetting
+          stopMissileBlink();
+          detonationOverlay.classList.remove('visible');
           solvedOverlay.classList.remove('visible');
-          // Hide timeout popup when resetting
           timeoutPopup.classList.remove('visible');
+        } else if (msg.state === 'awaiting_detonation') {
+          // Missile at origin — blink and show "Trajectoire Validée"
+          statusText.textContent = 'Trajectoire Validée';
+          directionHint.textContent = '';
+          if (msg.path) drawTrajectory(msg.path, msg.directions, msg.missileAt, msg.reverseLeg);
+          startMissileBlink();
+          detonationOverlay.classList.add('visible');
         } else if (msg.state === 'solved') {
-          // Explosion is triggered in correctInput handler when reaching position 0
-          // This state just ensures the display is updated
+          stopMissileBlink();
+          detonationOverlay.classList.remove('visible');
+          statusText.textContent = 'Missile neutralisé';
+          directionHint.textContent = '';
+          playExplosionVideo();
         } else if (msg.state === 'forward_animation') {
           statusText.textContent = 'Missile lancé';
         }
@@ -630,19 +656,7 @@ ws.onmessage = (event) => {
       // If going from index A to index B (where B < A), the forward direction was directions[B]
       const direction = puzzleState.directions ? puzzleState.directions[msg.toIndex] : 'left';
       animateReverseLeg(puzzleState.path, msg.fromIndex, msg.toIndex, msg.duration, direction);
-
-      // If this was the final leg (reached position 0 = Los Angeles), trigger explosion after animation
-      if (msg.toIndex === 0) {
-        setTimeout(() => {
-          explodeMissile();
-          statusText.textContent = 'Missile neutralisé';
-          directionHint.textContent = '';
-          // Show solved overlay after explosion
-          setTimeout(() => {
-            solvedOverlay.classList.add('visible');
-          }, 1000);
-        }, msg.duration * 1000 + 100); // Wait for animation + small buffer
-      }
+      // Final leg animation completes → server transitions to awaiting_detonation
       break;
 
     case 'wrongInput':
@@ -665,11 +679,19 @@ ws.onmessage = (event) => {
       }
       updateProgressBar(0);
       break;
+
+    case 'hackMode':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.activate();
+      break;
+
+    case 'hackResolved':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.deactivate();
+      break;
   }
 };
 
 ws.onclose = () => {
-  statusText.textContent = 'Connection lost';
+  statusText.textContent = 'Connexion perdue';
 };
 
 // --- Keyboard input ---
@@ -713,6 +735,7 @@ document.addEventListener('keydown', (e) => {
     if (key === 'x') ws.send(JSON.stringify({ type: 'activate' }));
     if (key === 'c') ws.send(JSON.stringify({ type: 'reset' }));
     if (key === 'v') ws.send(JSON.stringify({ type: 'forceSolve' }));
+    if (key === 'b') ws.send(JSON.stringify({ type: 'detonate' }));
   }
 });
 
@@ -731,4 +754,41 @@ if (timeoutStartBtn) {
     // Tell server to resume the timer
     ws.send(JSON.stringify({ type: 'resumeAfterTimeout' }));
   });
+}
+
+// --- Explosion Video ---
+const explosionOverlay = document.getElementById('explosion-overlay');
+const explosionVideo = document.getElementById('explosion-video');
+
+if (explosionVideo) {
+  explosionVideo.src = 'videos/explosion.mp4';
+  explosionVideo.load();
+}
+
+function playExplosionVideo() {
+  if (!explosionVideo || !explosionOverlay) {
+    // No video element — show solved overlay directly
+    solvedOverlay.classList.add('visible');
+    return;
+  }
+
+  explosionOverlay.classList.remove('fade-out');
+  explosionOverlay.classList.add('visible');
+  explosionVideo.currentTime = 0;
+  explosionVideo.play().then(() => {
+    console.log('[explosion] Video playing');
+  }).catch(() => {
+    // Video failed (missing file or autoplay blocked) — skip to solved
+    console.warn('[explosion] Video play failed — showing solved');
+    explosionOverlay.classList.remove('visible');
+    solvedOverlay.classList.add('visible');
+  });
+
+  explosionVideo.onended = () => {
+    explosionOverlay.classList.add('fade-out');
+    setTimeout(() => {
+      explosionOverlay.classList.remove('visible', 'fade-out');
+      solvedOverlay.classList.add('visible');
+    }, 1000);
+  };
 }

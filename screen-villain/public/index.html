@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gadget Code — Mission: Hollywood</title>
+  <title>Villain Feed — Mission: Hollywood</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -28,113 +28,33 @@
       z-index: 1;
     }
 
-    /* HUD overlay on top of video */
-    #hud {
+    /* Corner label */
+    #feed-label {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    /* Situation indicator — top center */
-    #situation-bar {
-      position: absolute;
-      top: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 20px;
-      align-items: center;
-    }
-
-    .situation-dot {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 2px solid rgba(0, 220, 255, 0.5);
-      background: transparent;
-      transition: all 0.5s ease;
-    }
-
-    .situation-dot.active {
-      border-color: #0df;
-      box-shadow: 0 0 10px rgba(0, 220, 255, 0.5);
-    }
-
-    .situation-dot.solved {
-      background: #0f6;
-      border-color: #0f6;
-      box-shadow: 0 0 12px rgba(0, 255, 100, 0.6);
-    }
-
-    /* Code input display — bottom center */
-    #code-display {
-      position: absolute;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 16px;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-
-    #code-display.visible {
-      opacity: 1;
-    }
-
-    .code-dot {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid rgba(0, 220, 255, 0.4);
-      background: transparent;
-      transition: all 0.2s ease;
-    }
-
-    .code-dot.filled {
-      background: #0df;
-      border-color: #0df;
-      box-shadow: 0 0 10px rgba(0, 220, 255, 0.6);
-    }
-
-    /* Feedback flash */
-    #feedback-flash {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      transition: opacity 0.15s ease;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    #feedback-flash.correct {
-      background: rgba(0, 255, 100, 0.15);
-      opacity: 1;
-    }
-
-    #feedback-flash.wrong {
-      background: rgba(255, 50, 50, 0.15);
-      opacity: 1;
-    }
-
-    /* Status text — bottom */
-    #status-text {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 14px;
-      color: rgba(0, 220, 255, 0.5);
+      top: 20px;
+      left: 24px;
+      z-index: 15;
+      font-size: 11px;
+      color: rgba(255, 0, 60, 0.5);
       text-transform: uppercase;
-      letter-spacing: 3px;
-      white-space: nowrap;
+      letter-spacing: 4px;
+      pointer-events: none;
+    }
+
+    #feed-label .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 0, 60, 0.7);
+      margin-right: 8px;
+      vertical-align: middle;
+      animation: dot-blink 2s ease-in-out infinite;
+    }
+
+    @keyframes dot-blink {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
     }
 
     /* Scanline effect */
@@ -167,6 +87,21 @@
       z-index: 21;
     }
 
+    /* Status text — bottom */
+    #status-text {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(255, 0, 60, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      white-space: nowrap;
+      z-index: 15;
+      pointer-events: none;
+    }
+
     /* Mock controls (dev mode only) */
     #mock-controls {
       display: none;
@@ -175,10 +110,10 @@
       right: 10px;
       z-index: 100;
       background: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(0, 220, 255, 0.3);
+      border: 1px solid rgba(255, 0, 60, 0.3);
       padding: 10px;
       font-size: 11px;
-      color: rgba(0, 220, 255, 0.7);
+      color: rgba(255, 0, 60, 0.7);
       pointer-events: auto;
     }
 
@@ -197,7 +132,7 @@
       left: 10px;
       z-index: 100;
       font-size: 11px;
-      color: rgba(0, 220, 255, 0.5);
+      color: rgba(255, 0, 60, 0.5);
       pointer-events: none;
     }
 
@@ -225,7 +160,7 @@
 
     #start-overlay .start-text {
       font-size: 24px;
-      color: #0df;
+      color: rgba(255, 0, 60, 0.9);
       text-transform: uppercase;
       letter-spacing: 6px;
       animation: pulse 2s ease-in-out infinite;
@@ -233,7 +168,7 @@
 
     #start-overlay .start-sub {
       font-size: 12px;
-      color: rgba(0, 220, 255, 0.4);
+      color: rgba(255, 0, 60, 0.4);
       margin-top: 12px;
       letter-spacing: 2px;
     }
@@ -250,7 +185,7 @@
       left: 50%;
       transform: translateX(-50%);
       font-size: 11px;
-      color: rgba(0, 220, 255, 0.4);
+      color: rgba(255, 0, 60, 0.4);
       letter-spacing: 2px;
       z-index: 201;
       transition: opacity 1s ease;
@@ -260,26 +195,19 @@
 <body>
   <video id="video-player" muted></video>
 
-  <div id="feedback-flash"></div>
-
-  <div id="hud">
-    <div id="situation-bar"></div>
-    <div id="code-display"></div>
-    <div id="status-text"></div>
-  </div>
+  <div id="feed-label"><span class="dot"></span>FLUX ENNEMI</div>
 
   <div id="scanlines"></div>
   <div id="vignette"></div>
 
+  <div id="status-text"></div>
+
   <div id="mock-controls">
     <div><strong>DEV CONTROLS</strong></div>
-    <div>Type digits 0-9 + Enter</div>
-    <div>Backspace to delete</div>
-    <div>Escape to clear</div>
-    <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
-    <div>A = Activate</div>
-    <div>R = Reset</div>
-    <div>F = Force Solve</div>
+    <hr style="border-color: rgba(255,0,60,0.2); margin: 6px 0;">
+    <div>H = Hack mode</div>
+    <div>N = Normal (resolve hack)</div>
+    <div>I = Intro clip</div>
   </div>
 
   <div id="debug-state"></div>

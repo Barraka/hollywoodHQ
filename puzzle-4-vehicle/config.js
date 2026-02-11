@@ -36,7 +36,7 @@ module.exports = {
     { 2: 10, 4: 11, 8: 14 },
     // Lever 4: positions 1, 5, 6
     { 1: 15, 5: 18, 6: 21 },
-  ]
+  ],
 
   // Room Controller
   roomControllerUrl: null,

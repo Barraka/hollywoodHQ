@@ -3,28 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
-const Encoders = require('./encoders');
-const Audio = require('./audio');
-const PuzzleLogic = require('./puzzleLogic');
 const RoomControllerClient = require('../../shared/roomController');
 
-// --- Detect mock mode ---
 const isMock = process.argv.includes('--mock');
-if (isMock) console.log('[server] Running in MOCK mode (keyboard input, browser audio)');
+if (isMock) console.log('[server] Running in MOCK mode');
 
-// --- Initialize modules ---
-const encoders = new Encoders(isMock);
-const audio = new Audio(isMock);
-const puzzle = new PuzzleLogic(encoders, audio);
-
-// --- HTTP server (serves frontend) ---
+// --- HTTP server ---
 const MIME_TYPES = {
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'application/javascript',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
+  '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
 };
 
 const publicDir = path.join(__dirname, '..', 'public');
@@ -36,7 +23,8 @@ const httpServer = http.createServer((req, res) => {
 
   let filePath;
   if (urlPath.startsWith('/shared/')) {
-    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+    // Serve shared browser files (e.g. /shared/glitch.js → ../../shared/browser/glitch.js)
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.replace('/shared/', '')));
   } else {
     filePath = path.join(publicDir, decodeURIComponent(urlPath));
   }
@@ -45,17 +33,13 @@ const httpServer = http.createServer((req, res) => {
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
 
   fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      res.end('Not found');
-      return;
-    }
+    if (err) { res.writeHead(404); res.end('Not found'); return; }
     res.writeHead(200, { 'Content-Type': mime });
     res.end(data);
   });
 });
 
-// --- WebSocket server (same port, upgrades HTTP) ---
+// --- WebSocket server ---
 const wss = new WebSocketServer({ server: httpServer });
 const clients = new Set();
 
@@ -70,25 +54,17 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log('[ws] Client connected (' + clients.size + ' total)');
 
-  // Send current state immediately
-  ws.send(JSON.stringify({ type: 'state', ...puzzle.getState() }));
   ws.send(JSON.stringify({ type: 'config', mock: isMock }));
 
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // In mock mode, accept keyboard input from the browser
-    if (msg.type === 'key' && isMock) {
-      const { axis, direction } = msg;
-      if ((axis === 'x' || axis === 'y') && (direction === 1 || direction === -1)) {
-        encoders.simulateTurn(axis, direction);
-      }
+    switch (msg.type) {
+      case 'ready':
+        console.log('[server] Client ready');
+        break;
     }
-
-    // GM commands
-    if (msg.type === 'reset') puzzle.reset();
-    if (msg.type === 'forceSolve') puzzle.forceSolve();
   });
 
   ws.on('close', () => {
@@ -96,30 +72,6 @@ wss.on('connection', (ws) => {
     console.log('[ws] Client disconnected (' + clients.size + ' total)');
   });
 });
-
-// --- Wire puzzle events to WebSocket ---
-puzzle.on('position', (pos) => {
-  broadcast({ type: 'position', x: pos.x, y: pos.y });
-});
-
-puzzle.on('holdProgress', (progress) => {
-  broadcast({ type: 'holdProgress', progress });
-});
-
-puzzle.on('solved', () => {
-  broadcast({ type: 'solved' });
-});
-
-puzzle.on('reset', () => {
-  broadcast({ type: 'reset', ...puzzle.getState() });
-});
-
-// In mock mode, send beep events to browser for Web Audio playback
-if (isMock) {
-  audio.onBeep = (axis) => {
-    broadcast({ type: 'beep', axis });
-  };
-}
 
 // --- Room Controller integration ---
 const rc = new RoomControllerClient(config.roomControllerUrl, config.propId);
@@ -129,23 +81,21 @@ rc.on('command', (cmd) => {
 
   try {
     switch (cmd.command) {
-      case 'force_solve':
-        puzzle.forceSolve();
-        rc.sendAck(cmd.requestId, true);
-        break;
-
-      case 'reset':
-        puzzle.reset();
-        rc.sendAck(cmd.requestId, true);
-        break;
-
       case 'hack_mode':
+        console.log('[rc] Activating hack mode');
         broadcast({ type: 'hackMode' });
         rc.sendAck(cmd.requestId, true);
         break;
 
       case 'hack_resolved':
+        console.log('[rc] Hack resolved');
         broadcast({ type: 'hackResolved' });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'reset':
+        console.log('[rc] Resetting immersion screen');
+        broadcast({ type: 'reset' });
         rc.sendAck(cmd.requestId, true);
         break;
 
@@ -159,29 +109,17 @@ rc.on('command', (cmd) => {
   }
 });
 
-// Wire puzzle state changes to Room Controller
-puzzle.on('solved', () => {
-  rc.updateState({ state: 'solved', progress: 1.0 });
-});
-
-puzzle.on('reset', () => {
-  rc.updateState({ state: 'active', progress: 0 });
-});
-
 rc.connect();
 
 // --- Start ---
 httpServer.listen(config.httpPort, () => {
   console.log('[server] http://localhost:' + config.httpPort);
-  console.log('[puzzle] Target: (' + config.targetX + ', ' + config.targetY + ') tolerance: ' + config.tolerance);
+  console.log('[immersion] Spy dashboard immersion screen');
 });
 
-// --- Graceful shutdown ---
 process.on('SIGINT', () => {
   console.log('\n[server] Shutting down...');
   rc.disconnect();
-  encoders.destroy();
-  audio.destroy();
   httpServer.close();
   process.exit(0);
 });

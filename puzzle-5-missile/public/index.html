@@ -226,6 +226,16 @@
       }
     }
 
+    /* Missile blink (awaiting detonation) */
+    .missile-blink {
+      animation: missileBlink 0.6s ease-in-out infinite;
+    }
+
+    @keyframes missileBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
     /* Screen flash effect */
     .screen-flash {
       animation: screenFlash 0.5s ease-out forwards;
@@ -397,6 +407,80 @@
         opacity: 1;
         transform: scale(1);
       }
+    }
+
+    /* Detonation-ready overlay */
+    #detonation-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 45;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #detonation-overlay.visible {
+      opacity: 1;
+    }
+
+    #detonation-overlay .detonation-text {
+      font-size: 42px;
+      font-weight: 900;
+      color: #0df;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      text-shadow: 0 0 30px rgba(0, 220, 255, 0.6), 0 0 60px rgba(0, 220, 255, 0.3);
+    }
+
+    #detonation-overlay .detonation-subtitle {
+      font-size: 22px;
+      color: rgba(255, 80, 80, 0.9);
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(255, 80, 80, 0.5), 0 0 40px rgba(255, 80, 80, 0.2);
+    }
+
+    #detonation-overlay.visible .detonation-text,
+    #detonation-overlay.visible .detonation-subtitle {
+      animation: detonationPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes detonationPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Explosion video overlay */
+    #explosion-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 55;
+      background: #000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+
+    #explosion-overlay.visible {
+      display: flex;
+    }
+
+    #explosion-overlay.fade-out {
+      opacity: 0;
+    }
+
+    #explosion-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     /* Timeout popup */
@@ -588,6 +672,16 @@
     <div id="status-text"></div>
   </div>
 
+  <div id="detonation-overlay">
+    <div class="detonation-text">Trajectoire Validée</div>
+    <div class="detonation-subtitle">Détonez la bombe!</div>
+  </div>
+
+  <!-- Explosion video overlay -->
+  <div id="explosion-overlay">
+    <video id="explosion-video" preload="auto"></video>
+  </div>
+
   <div id="solved-overlay">
     <div class="solved-text">Missile neutralisé</div>
   </div>
@@ -595,7 +689,7 @@
   <div id="timeout-popup">
     <div class="timeout-content">
       <div class="timeout-text">Trop lent, il faut être plus rapide!!</div>
-      <button id="timeout-start-btn" class="timeout-btn">START</button>
+      <button id="timeout-start-btn" class="timeout-btn">RECOMMENCER</button>
     </div>
   </div>
 
@@ -608,6 +702,7 @@
     <div>ou Flèches pour N/S/E/W</div>
     <hr style="border-color: rgba(0,220,255,0.2); margin: 6px 0;">
     <div>X = Activer | C = Réinitialiser | V = Forcer résolution</div>
+    <div>B = Détoner (bouton rouge)</div>
   </div>
 
   <div id="debug-state"></div>
@@ -617,6 +712,7 @@
     <div class="start-sub">ou appuyez sur une touche</div>
   </div>
 
+  <script src="/shared/glitch.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

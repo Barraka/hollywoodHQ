@@ -21,11 +21,18 @@ const MIME_TYPES = {
 };
 
 const publicDir = path.join(__dirname, '..', 'public');
+const sharedBrowserDir = path.join(__dirname, '..', '..', 'shared', 'browser');
 
 const httpServer = http.createServer((req, res) => {
-  let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = filePath.split('?')[0];
-  filePath = path.join(publicDir, decodeURIComponent(filePath));
+  let urlPath = req.url === '/' ? '/index.html' : req.url;
+  urlPath = urlPath.split('?')[0];
+
+  let filePath;
+  if (urlPath.startsWith('/shared/')) {
+    filePath = path.join(sharedBrowserDir, decodeURIComponent(urlPath.slice(8)));
+  } else {
+    filePath = path.join(publicDir, decodeURIComponent(urlPath));
+  }
 
   const ext = path.extname(filePath);
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
@@ -136,6 +143,20 @@ rc.on('command', (cmd) => {
         rc.sendAck(cmd.requestId, true);
         break;
 
+      case 'hack_mode':
+        // Hack mode: activate puzzle (buttons start flashing) + show glitch overlay
+        broadcast({ type: 'hackMode' });
+        if (puzzle.getState().state === 'inactive') {
+          puzzle.activate();
+        }
+        rc.sendAck(cmd.requestId, true);
+        break;
+
+      case 'hack_resolved':
+        broadcast({ type: 'hackResolved' });
+        rc.sendAck(cmd.requestId, true);
+        break;
+
       default:
         console.log('[rc] Unknown command:', cmd.command);
         rc.sendAck(cmd.requestId, false, 'Unknown command');
@@ -148,10 +169,18 @@ rc.on('command', (cmd) => {
 
 // Wire puzzle state changes to Room Controller
 puzzle.on('stateChange', (state) => {
-  rc.updateState({
+  const update = {
     state: state.state,
-    progress: state.lockedCount / config.buttons.length
-  });
+    progress: state.pressedCount / config.buttons.length
+  };
+
+  // When puzzle is solved, signal hack resolved to all screens
+  if (state.state === 'solved') {
+    update.hackResolved = true;
+    broadcast({ type: 'hackResolved' });
+  }
+
+  rc.updateState(update);
 });
 
 rc.connect();

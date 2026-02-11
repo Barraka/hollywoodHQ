@@ -57,9 +57,9 @@ function updatePreloadProgress() {
   const el = document.getElementById('preload-status');
   if (el) {
     if (preloadDone < preloadTotal) {
-      el.textContent = `Loading videos... ${pct}%`;
+      el.textContent = `Chargement des vidéos... ${pct}%`;
     } else {
-      el.textContent = 'All videos loaded';
+      el.textContent = 'Toutes les vidéos chargées';
       setTimeout(() => { el.style.opacity = '0'; }, 1000);
     }
   }
@@ -223,13 +223,13 @@ ws.onmessage = (event) => {
 
       if (msg.state === 'situation') {
         codeDisplay.classList.add('visible');
-        statusText.textContent = `Situation ${msg.currentSituation + 1} — Enter code`;
+        statusText.textContent = `Situation ${msg.currentSituation + 1} — Entrez le code`;
       } else if (msg.state === 'inactive') {
         codeDisplay.classList.remove('visible');
-        statusText.textContent = 'Awaiting activation';
+        statusText.textContent = 'En attente d\'activation';
       } else if (msg.state === 'solved') {
         codeDisplay.classList.remove('visible');
-        statusText.textContent = 'Mission complete';
+        statusText.textContent = 'Mission accomplie';
       } else {
         codeDisplay.classList.remove('visible');
         statusText.textContent = '';
@@ -246,7 +246,7 @@ ws.onmessage = (event) => {
       playIdle();
       codeDisplay.classList.add('visible');
       updateCodeDots(0, puzzleState.codeLength || 4);
-      statusText.textContent = `Situation ${msg.situationIndex + 1} — Enter code`;
+      statusText.textContent = `Situation ${msg.situationIndex + 1} — Entrez le code`;
       break;
 
     case 'codeProgress':
@@ -257,12 +257,20 @@ ws.onmessage = (event) => {
       flashFeedback(msg.correct);
       updateCodeDots(0, puzzleState.codeLength || 4);
       break;
+
+    case 'hackMode':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.activate();
+      break;
+
+    case 'hackResolved':
+      if (typeof HackGlitch !== 'undefined') HackGlitch.deactivate();
+      break;
   }
 };
 
 ws.onclose = () => {
   console.log('[ws] Disconnected');
-  statusText.textContent = 'Connection lost';
+  statusText.textContent = 'Connexion perdue';
 };
 
 // --- Keyboard input (numpad + keyboard digits) ---

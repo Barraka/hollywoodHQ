@@ -1,0 +1,13 @@
+{
+  "name": "screen-villain",
+  "version": "1.0.0",
+  "description": "Mission: Hollywood — Villain clips screen",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js --mock"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

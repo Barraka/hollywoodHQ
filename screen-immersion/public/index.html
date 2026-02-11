@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field Operations Center — Mission: Hollywood</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #060612;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+
+    /* ── Layout: 2-column grid with top/bottom bars ── */
+    #dashboard {
+      display: grid;
+      grid-template-rows: 40px 1fr 32px;
+      grid-template-columns: 1fr 1fr;
+      width: 100vw;
+      height: 100vh;
+      gap: 6px;
+      padding: 6px;
+    }
+
+    /* ── Top bar ── */
+    #top-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 220, 255, 0.04);
+      border: 1px solid rgba(0, 220, 255, 0.15);
+      font-size: 13px;
+      letter-spacing: 6px;
+      color: rgba(0, 220, 255, 0.7);
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(0, 220, 255, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #top-bar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0, 220, 255, 0.06), transparent);
+      animation: topBarSweep 6s linear infinite;
+    }
+
+    @keyframes topBarSweep {
+      0% { left: -50%; }
+      100% { left: 100%; }
+    }
+
+    .cursor-blink {
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* ── Bottom bar ── */
+    #bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: rgba(0, 220, 255, 0.04);
+      border: 1px solid rgba(0, 220, 255, 0.15);
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.5);
+      letter-spacing: 2px;
+    }
+
+    #bottom-bar .uplink {
+      color: rgba(0, 255, 120, 0.7);
+      text-shadow: 0 0 6px rgba(0, 255, 120, 0.3);
+    }
+
+    /* ── Panel base ── */
+    .panel {
+      background: rgba(0, 10, 20, 0.6);
+      border: 1px solid rgba(0, 220, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .panel-header {
+      background: rgba(0, 220, 255, 0.06);
+      border-bottom: 1px solid rgba(0, 220, 255, 0.1);
+      padding: 6px 12px;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: rgba(0, 220, 255, 0.6);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .panel-header .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(0, 220, 255, 0.5);
+      box-shadow: 0 0 4px rgba(0, 220, 255, 0.4);
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── THREAT RADAR panel ── */
+    #radar-panel { grid-row: 2; grid-column: 1; }
+
+    #radar-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ── SYSTEM STATUS panel ── */
+    #status-panel { grid-row: 2; grid-column: 1; display: none; }
+
+    /* We stack radar + status vertically in the left column */
+    .left-col {
+      grid-row: 2;
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .left-col .panel {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Right column ── */
+    .right-col {
+      grid-row: 2;
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .right-col .panel {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── System status bars ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      gap: 12px;
+    }
+
+    .status-label {
+      width: 100px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: rgba(0, 220, 255, 0.5);
+      flex-shrink: 0;
+    }
+
+    .status-bar-bg {
+      flex: 1;
+      height: 10px;
+      background: rgba(0, 220, 255, 0.06);
+      border: 1px solid rgba(0, 220, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(0, 220, 255, 0.3), rgba(0, 220, 255, 0.6));
+      transition: width 0.8s ease;
+      position: relative;
+    }
+
+    .status-bar-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 3px;
+      height: 100%;
+      background: rgba(0, 220, 255, 0.9);
+      box-shadow: 0 0 6px rgba(0, 220, 255, 0.6);
+    }
+
+    .status-bar-fill.warning {
+      background: linear-gradient(90deg, rgba(255, 180, 0, 0.3), rgba(255, 180, 0, 0.6));
+    }
+
+    .status-bar-fill.warning::after {
+      background: rgba(255, 180, 0, 0.9);
+      box-shadow: 0 0 6px rgba(255, 180, 0, 0.6);
+    }
+
+    .status-bar-fill.critical {
+      background: linear-gradient(90deg, rgba(255, 50, 50, 0.3), rgba(255, 50, 50, 0.6));
+    }
+
+    .status-bar-fill.critical::after {
+      background: rgba(255, 50, 50, 0.9);
+      box-shadow: 0 0 6px rgba(255, 50, 50, 0.6);
+    }
+
+    .status-value {
+      width: 45px;
+      font-size: 10px;
+      color: rgba(0, 220, 255, 0.7);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Signal intercept (hex feed) ── */
+    #hex-feed {
+      padding: 6px 10px;
+      font-size: 10px;
+      line-height: 1.6;
+      color: rgba(0, 220, 255, 0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      height: 100%;
+      word-break: break-all;
+    }
+
+    .hex-line {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .hex-line.new {
+      color: rgba(0, 220, 255, 0.7);
+      text-shadow: 0 0 4px rgba(0, 220, 255, 0.2);
+    }
+
+    /* ── Comm monitor ── */
+    #comm-feed {
+      padding: 8px 12px;
+      font-size: 11px;
+      line-height: 1.8;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      height: 100%;
+    }
+
+    .comm-line {
+      color: rgba(0, 220, 255, 0.4);
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(0, 220, 255, 0.04);
+    }
+
+    .comm-line.new {
+      color: rgba(0, 255, 120, 0.7);
+      text-shadow: 0 0 4px rgba(0, 255, 120, 0.2);
+    }
+
+    .comm-time {
+      color: rgba(0, 220, 255, 0.3);
+      margin-right: 8px;
+    }
+
+    /* ── Scanlines + vignette ── */
+    #scanlines {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.04) 2px,
+        rgba(0, 0, 0, 0.04) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    #vignette {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+      pointer-events: none;
+      z-index: 101;
+    }
+
+    /* ── Start overlay ── */
+    #start-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    #start-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    #start-overlay .start-text {
+      font-size: 24px;
+      color: #0df;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    #start-overlay .start-sub {
+      font-size: 12px;
+      color: rgba(0, 220, 255, 0.4);
+      margin-top: 12px;
+      letter-spacing: 2px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* ── Mock controls ── */
+    #mock-controls {
+      display: none;
+      position: fixed;
+      top: 10px; right: 10px;
+      z-index: 150;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(0, 220, 255, 0.3);
+      padding: 10px;
+      font-size: 11px;
+      color: rgba(0, 220, 255, 0.7);
+    }
+
+    #mock-controls.visible { display: block; }
+    #mock-controls div { margin: 3px 0; }
+  </style>
+</head>
+<body>
+  <div id="dashboard">
+    <!-- Top bar -->
+    <div id="top-bar">
+      CENTRE D'OPÉRATIONS TERRAIN &mdash; CLASSIFIÉ &mdash; NIVEAU 5<span class="cursor-blink">&block;</span>
+    </div>
+
+    <!-- Left column: Radar + System Status -->
+    <div class="left-col">
+      <div class="panel" id="radar-panel">
+        <div class="panel-header"><span class="dot"></span>RADAR MENACES</div>
+        <div class="panel-body">
+          <canvas id="radar-canvas"></canvas>
+        </div>
+      </div>
+      <div class="panel" id="status-panel">
+        <div class="panel-header"><span class="dot"></span>ÉTAT SYSTÈME</div>
+        <div class="panel-body" id="status-bars">
+          <div class="status-row">
+            <span class="status-label">CHARGE CPU</span>
+            <div class="status-bar-bg"><div class="status-bar-fill" id="bar-cpu" style="width:45%"></div></div>
+            <span class="status-value" id="val-cpu">45%</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">MÉMOIRE</span>
+            <div class="status-bar-bg"><div class="status-bar-fill" id="bar-mem" style="width:62%"></div></div>
+            <span class="status-value" id="val-mem">62%</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">RÉSEAU E/S</span>
+            <div class="status-bar-bg"><div class="status-bar-fill" id="bar-net" style="width:30%"></div></div>
+            <span class="status-value" id="val-net">30%</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">CHIFFREMENT</span>
+            <div class="status-bar-bg"><div class="status-bar-fill" id="bar-enc" style="width:88%"></div></div>
+            <span class="status-value" id="val-enc">88%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Signal Intercept + Comm Monitor -->
+    <div class="right-col">
+      <div class="panel" id="hex-panel">
+        <div class="panel-header"><span class="dot"></span>INTERCEPTION SIGNAL</div>
+        <div class="panel-body">
+          <div id="hex-feed"></div>
+        </div>
+      </div>
+      <div class="panel" id="comm-panel">
+        <div class="panel-header"><span class="dot"></span>MONITEUR COMM</div>
+        <div class="panel-body">
+          <div id="comm-feed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div id="bottom-bar">
+      <span>LAT 48.8566&deg; N &nbsp; LON 2.3522&deg; E &nbsp; ALT 312m</span>
+      <span id="clock">00:00:00</span>
+      <span class="uplink">&#9679; LIAISON : ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+
+  <!-- Mock controls -->
+  <div id="mock-controls">
+    <div><strong>DEV CONTROLS</strong></div>
+    <div>H = Hack mode</div>
+    <div>N = Normal mode</div>
+  </div>
+
+  <!-- Start overlay -->
+  <div id="start-overlay">
+    <div class="start-text">Cliquez pour initialiser</div>
+    <div class="start-sub">ou appuyez sur une touche</div>
+  </div>
+
+  <script src="/shared/glitch.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
