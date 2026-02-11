@@ -204,7 +204,7 @@ rc.on('command', (cmd) => {
 puzzle.on('stateChange', (state) => {
   rc.updateState({
     state: state.state,
-    progress: state.pathIndex / config.path.length
+    progress: state.totalLegs > 0 ? state.reverseLeg / state.totalLegs : 0
   });
 });
 

@@ -185,7 +185,12 @@ Each Raspberry Pi has **28 usable GPIO pins** (BCM numbering). See [GPIO_ALLOCAT
 - **Wiegand protocol:** Puzzle 3 uses 2 pins instead of 10 for full keypad
 - **Sparse lever wiring:** Puzzle 4 uses 12 pins instead of 40 for all positions
 
+## v1.1.0 — Audit Bug Fix Pass
+
+- **Puzzle 3 (Gadget Code)**: Fixed NaN progress reported to Room Controller — `state.solvedCount` (undefined) → `state.currentSituation`
+- **Puzzle 3 (Gadget Code)**: Added digit validation in `puzzleLogic.js` — rejects non-numeric WebSocket input (`/^[0-9]$/` check)
+- **Puzzle 5 (Missile)**: Fixed NaN progress reported to Room Controller — `state.pathIndex` (undefined) → `state.reverseLeg / state.totalLegs`
+
 ## Related Projects
 
 - **GM Manager** (`c:\02 - GM Manager\escapeRoomManager`) — React dashboard for Game Masters. Connects to Room Controller via WebSocket. Displays props timeline, manages sessions, hints, audio, and statistics.
-- **Leonie Game** (`c:\09 - Leonie Game`) — Unrelated project (Babylon.js 3D horse riding game with Colyseus multiplayer).

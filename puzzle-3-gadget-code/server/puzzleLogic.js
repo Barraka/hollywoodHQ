@@ -78,6 +78,7 @@ class PuzzleLogic extends EventEmitter {
   digitPressed(digit) {
     if (this.state !== SITUATION) return;
     if (this.codeBuffer.length >= config.codeLength) return;
+    if (typeof digit !== 'string' || !/^[0-9]$/.test(digit)) return;
 
     this.codeBuffer += digit;
     console.log(`[puzzle3] Digit: ${digit} → buffer: ${this.codeBuffer}`);

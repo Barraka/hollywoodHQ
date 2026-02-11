@@ -265,7 +265,7 @@ rc.on('command', (cmd) => {
 puzzle.on('stateChange', (state) => {
   rc.updateState({
     state: state.state,
-    progress: state.solvedCount / config.situations.length
+    progress: state.currentSituation / config.situations.length
   });
 });
 
